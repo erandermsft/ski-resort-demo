@@ -1,13 +1,14 @@
-﻿#:sdk Aspire.AppHost.Sdk@13.2.0-pr.15228.g1e98fa54
-#:package Aspire.Hosting.Foundry@13.2.0-pr.15228.g1e98fa54
-#:package Aspire.Hosting.Azure.CosmosDB@13.2.0-pr.15228.g1e98fa54
-#:package Aspire.Hosting.Python@13.2.0-pr.15228.g1e98fa54
-#:package Aspire.Hosting.JavaScript@13.2.0-pr.15228.g1e98fa54
+﻿#:sdk Aspire.AppHost.Sdk@13.2.0
+#:package Aspire.Hosting.Foundry@13.2.0-ci
+#:package Aspire.Hosting.Azure.CosmosDB@13.2.0
+#:package Aspire.Hosting.Python@13.2.0
+#:package Aspire.Hosting.JavaScript@13.2.0
 
 #:project ./advisor-agent-dotnet/AdvisorAgent.Dotnet.csproj
 #:project ./lift-traffic-agent-dotnet/LiftTrafficAgent.Dotnet.csproj
 
 using Aspire.Hosting.Foundry;
+using Aspire.Hosting.Pipelines;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
@@ -16,7 +17,7 @@ var tenantId = builder.AddParameterFromConfiguration("tenant", "Azure:TenantId")
 var foundry = builder.AddFoundry("aif-ski-resort-demo");
 var project = foundry.AddProject("proj-ski-resort-demo");
 var deployment = project.AddModelDeployment("gpt41", FoundryModel.OpenAI.Gpt41)
-    .WithProperties(configure => configure.SkuCapacity = 150 );
+    .WithProperties(configure => configure.SkuCapacity = 150);
 
 #pragma warning disable ASPIRECOSMOSDB001
 var cosmos = builder.AddAzureCosmosDB("cosmos-db")
