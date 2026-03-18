@@ -8,7 +8,6 @@
 #:project ./lift-traffic-agent-dotnet/LiftTrafficAgent.Dotnet.csproj
 
 using Aspire.Hosting.Foundry;
-using Aspire.Hosting.Pipelines;
 
 var builder = DistributedApplication.CreateBuilder(args);
 

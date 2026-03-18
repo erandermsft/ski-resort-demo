@@ -99,7 +99,7 @@ def create_app():
     port = int(os.environ.get("PORT", 8082))
     host = os.environ.get("HOST", "0.0.0.0")
 
-    configure_otel_providers()
+    configure_otel_providers(enable_sensitive_data=True)
 
     agent_card = get_agent_card(host, port)
     agent_executor = SafetyAgentExecutor()
