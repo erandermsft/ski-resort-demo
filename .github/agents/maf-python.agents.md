@@ -979,7 +979,7 @@ from agent_framework.observability import configure_otel_providers
 def configure_telemetry(app_instance):
     """Configure OpenTelemetry for the application."""
     # Setup agent framework observability
-    configure_otel_providers()
+    configure_otel_providers(enable_sensitive_data=True)
     
     # Setup trace provider
     trace.set_tracer_provider(TracerProvider())

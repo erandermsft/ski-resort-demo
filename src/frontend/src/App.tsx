@@ -9,7 +9,7 @@ export default function App() {
       <header className="flex items-center gap-3 px-6 py-4 border-b border-slate-700/60 bg-slate-900/80 backdrop-blur">
         <span className="text-2xl">🏔️</span>
         <h1 className="text-xl font-bold text-white tracking-tight">
-          AlpineAI
+          (Al)PineAI
           <span className="text-slate-400 font-normal ml-2 text-base">
             Ski Resort Dashboard
           </span>
