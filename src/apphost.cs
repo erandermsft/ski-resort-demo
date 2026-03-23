@@ -1,5 +1,5 @@
 ﻿#:sdk Aspire.AppHost.Sdk@13.2.0
-#:package Aspire.Hosting.Foundry@13.2.0-ci
+#:package Aspire.Hosting.Foundry@13.2.0-preview.1.26170.3
 #:package Aspire.Hosting.Azure.CosmosDB@13.2.0
 #:package Aspire.Hosting.Python@13.2.0
 #:package Aspire.Hosting.JavaScript@13.2.0

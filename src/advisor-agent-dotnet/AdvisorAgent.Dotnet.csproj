@@ -11,7 +11,7 @@
     <PackageReference Include="Microsoft.Agents.AI.Hosting" Version="1.0.0-preview.260212.1" />
     <PackageReference Include="Microsoft.Agents.AI.Hosting.A2A.AspNetCore" Version="1.0.0-preview.260212.1" />
     <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.0.0-preview.260212.1" />
-    <PackageReference Include="Aspire.Azure.AI.Inference" Version="13.2.0-ci" />
+    <PackageReference Include="Aspire.Azure.AI.Inference" Version="13.2.0-preview.1.26170.3" />
     <PackageReference Include="Aspire.Microsoft.Azure.Cosmos" Version="13.2.0" />
   </ItemGroup>
   <ItemGroup>
