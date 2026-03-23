@@ -1,5 +1,7 @@
 {
-  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "appHost": {
+    "path": "apphost.cs"
+  },
   "profiles": {
     "https": {
       "commandName": "Project",
