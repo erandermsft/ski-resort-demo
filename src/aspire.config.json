@@ -4,9 +4,6 @@
   },
   "profiles": {
     "https": {
-      "commandName": "Project",
-      "dotnetRunMessages": true,
-      "launchBrowser": true,
       "applicationUrl": "https://skiresort.dev.localhost:17032;http://skiresort.dev.localhost:15109",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
@@ -17,9 +14,6 @@
       }
     },
     "http": {
-      "commandName": "Project",
-      "dotnetRunMessages": true,
-      "launchBrowser": true,
       "applicationUrl": "http://skiresort.dev.localhost:15109",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
