@@ -118,7 +118,7 @@ public sealed class VoiceWebSocketHandler
         {
             Model = _model,
             Instructions = instructions,
-            Voice = new AzureStandardVoice(_voice),
+            Voice = new OpenAIVoice(new OAIVoice(_voice)),
             InputAudioFormat = InputAudioFormat.Pcm16,
             OutputAudioFormat = OutputAudioFormat.Pcm16,
             TurnDetection = new AzureSemanticVadTurnDetection

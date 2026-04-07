@@ -33,15 +33,16 @@ builder.Services.AddCors(options =>
 });
 
 // Parse the project endpoint and deployment name from Foundry connection strings
-var projectConnectionString = builder.Configuration.GetConnectionString("proj-voice-ski-resort-demo") ?? "";
-var endpoint = ParseConnectionStringValue(projectConnectionString, "Endpoint")
-    ?? ParseConnectionStringValue(projectConnectionString, "EndpointAIInference");
+var projectConnectionString = "https://aif-voice-ski-resort-dem.cognitiveservices.azure.com/openai/realtime?api-version=2024-10-01-preview&deployment=gptrealtime";
+// var endpoint = ParseConnectionStringValue(projectConnectionString, "Endpoint")
+//     ?? ParseConnectionStringValue(projectConnectionString, "EndpointAIInference");
+var endpoint = projectConnectionString;
 
 var deploymentConnectionString = builder.Configuration.GetConnectionString("gptrealtime") ?? "";
 var model = ParseConnectionStringValue(deploymentConnectionString, "Deployment")
     ?? builder.Configuration["VoiceLive:Model"]
     ?? "gpt-realtime";
-var voice = builder.Configuration["VoiceLive:Voice"] ?? "en-US-Ava:DragonHDLatestNeural";
+var voice = builder.Configuration["VoiceLive:Voice"] ?? "alloy";
 
 // Connect to downstream agents via A2A
 var agents = new Dictionary<string, AIAgent>();
