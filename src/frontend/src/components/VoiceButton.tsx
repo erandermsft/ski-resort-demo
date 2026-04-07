@@ -3,6 +3,7 @@ import { VoiceSession, type VoiceStatus, type VoiceTranscript } from '../lib/Voi
 
 interface VoiceButtonProps {
     onTranscript: (transcript: VoiceTranscript) => void;
+    onConversationId?: (id: string) => void;
     disabled?: boolean;
     conversationId?: string;
 }
@@ -16,7 +17,7 @@ const STATUS_LABELS: Record<VoiceStatus, string> = {
     function_calling: '🔧 Searching...',
 };
 
-export default function VoiceButton({ onTranscript, disabled, conversationId }: VoiceButtonProps) {
+export default function VoiceButton({ onTranscript, onConversationId, disabled, conversationId }: VoiceButtonProps) {
     const [status, setStatus] = useState<VoiceStatus>('disconnected');
     const [error, setError] = useState<string | null>(null);
     const sessionRef = useRef<VoiceSession | null>(null);
@@ -33,6 +34,7 @@ export default function VoiceButton({ onTranscript, disabled, conversationId }: 
         setError(null);
         const session = new VoiceSession({
             onTranscript,
+            onConversationId,
             onStatus: (newStatus) => setStatus(newStatus),
             onError: (msg) => {
                 setError(msg);

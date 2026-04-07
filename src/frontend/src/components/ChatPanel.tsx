@@ -16,17 +16,78 @@ export default function ChatPanel() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [contextId, setContextId] = useState<string | undefined>(undefined);
+  const contextIdRef = useRef<string | undefined>(undefined);
   const endRef = useRef<HTMLDivElement>(null);
   const accRef = useRef('');
+  const initRef = useRef(false);
+
+  // Keep ref in sync with state so voice callbacks always have the latest value
+  useEffect(() => { contextIdRef.current = contextId; }, [contextId]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // On mount, send an empty greeting to get the agent to introduce itself and capture the contextId
+  useEffect(() => {
+    if (initRef.current) return;
+    initRef.current = true;
+    (async () => {
+      setLoading(true);
+      setMessages([{ role: 'agent', text: '', source: 'chat' }]);
+      accRef.current = '';
+      try {
+        for await (const event of sendMessageStream('', undefined)) {
+          if (event.contextId) {
+            setContextId(event.contextId);
+          }
+          if (event.content) {
+            accRef.current += event.content;
+            const snapshot = accRef.current;
+            setMessages([{ role: 'agent', text: snapshot, source: 'chat' }]);
+          }
+        }
+        if (!accRef.current) {
+          setMessages([{ role: 'agent', text: 'Hello! How can I help you today?', source: 'chat' }]);
+        }
+      } catch {
+        setMessages([{ role: 'agent', text: 'Hello! How can I help you today?', source: 'chat' }]);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
   function handleNewConversation() {
     setMessages([]);
     setContextId(undefined);
+    initRef.current = false;
     resetClient();
+    // Re-trigger greeting
+    (async () => {
+      setLoading(true);
+      setMessages([{ role: 'agent', text: '', source: 'chat' }]);
+      accRef.current = '';
+      try {
+        for await (const event of sendMessageStream('', undefined)) {
+          if (event.contextId) {
+            setContextId(event.contextId);
+          }
+          if (event.content) {
+            accRef.current += event.content;
+            const snapshot = accRef.current;
+            setMessages([{ role: 'agent', text: snapshot, source: 'chat' }]);
+          }
+        }
+        if (!accRef.current) {
+          setMessages([{ role: 'agent', text: 'Hello! How can I help you today?', source: 'chat' }]);
+        }
+      } catch {
+        setMessages([{ role: 'agent', text: 'Hello! How can I help you today?', source: 'chat' }]);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }
 
   const handleVoiceTranscript = useCallback((transcript: VoiceTranscript) => {
@@ -120,7 +181,7 @@ export default function ChatPanel() {
         <div className="flex items-center gap-2">
           <VoiceButton
             onTranscript={handleVoiceTranscript}
-            disabled={loading}
+            disabled={loading || !contextId}
             conversationId={contextId}
           />
           <button

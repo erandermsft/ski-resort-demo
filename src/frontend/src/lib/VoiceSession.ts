@@ -10,6 +10,7 @@ export interface VoiceSessionCallbacks {
     onTranscript: (transcript: VoiceTranscript) => void;
     onStatus: (status: VoiceStatus, detail?: string) => void;
     onError: (message: string) => void;
+    onConversationId?: (id: string) => void;
 }
 
 const PCM_SAMPLE_RATE = 24000;
@@ -182,6 +183,9 @@ export class VoiceSession {
             switch (msg.type) {
                 case 'ready':
                     this.setStatus('ready');
+                    if (msg.conversationId) {
+                        this.callbacks.onConversationId?.(msg.conversationId);
+                    }
                     break;
 
                 case 'audio':

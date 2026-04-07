@@ -72,7 +72,7 @@ public sealed class VoiceWebSocketHandler
 
             await ConfigureSessionAsync(session, _instructions);
             await InjectConversationHistoryAsync(session, cancellationToken);
-            await SendToClient(new { type = "ready" }, cancellationToken);
+            await SendToClient(new { type = "ready", conversationId = _conversationId }, cancellationToken);
 
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
