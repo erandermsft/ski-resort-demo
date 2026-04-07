@@ -62,7 +62,7 @@ public sealed class CosmosChatHistoryProvider : ChatHistoryProvider, IDisposable
     public string ContainerId { get; init; }
 
     /// <inheritdoc />
-    public override string StateKey => this._sessionState.StateKey;
+    public override IReadOnlyList<string> StateKeys => [this._sessionState.StateKey];
 
 #pragma warning disable MEAI001
 

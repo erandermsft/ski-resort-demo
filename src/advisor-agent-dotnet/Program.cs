@@ -131,7 +131,7 @@ app.MapA2A("advisor-agent", "/agenta2a", new AgentCard
         PushNotifications = false
     },
     Skills = [
-        new AgentSkill
+        new A2A.AgentSkill
         {
             Name = "Ski Resort Advisory",
             Description = "Coordinate weather, lift traffic, safety, and coaching information to provide personalized ski resort recommendations",

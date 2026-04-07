@@ -14,10 +14,12 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 var tenantId = builder.AddParameterFromConfiguration("tenant", "Azure:TenantId");
 
-var foundry = builder.AddFoundry("aif-ski-resort-demo");
-var project = foundry.AddProject("proj-ski-resort-demo");
+var foundry = builder.AddFoundry("aif-voice-ski-resort-demo");
+var project = foundry.AddProject("proj-voice-ski-resort-demo");
 var deployment = project.AddModelDeployment("gpt41", FoundryModel.OpenAI.Gpt41)
     .WithProperties(configure => configure.SkuCapacity = 150);
+var voiceDeployment = project.AddModelDeployment("gpt41", FoundryModel.OpenAI.GptRealtime)
+    .WithProperties(configure => configure.SkuCapacity = 100);    
 
 #pragma warning disable ASPIRECOSMOSDB001
 var cosmos = builder.AddAzureCosmosDB("cosmos-db")
