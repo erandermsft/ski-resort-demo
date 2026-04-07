@@ -112,7 +112,9 @@ app.Map("/ws/voice", async (HttpContext context) =>
     var cosmosContainer = context.RequestServices.GetRequiredService<Container>();
 
     // Use conversationId directly (no suffix) so voice and chat histories are merged
-    var conversationId = context.Request.Query["conversationId"].FirstOrDefault();
+    // Generate one if not provided so voice-only sessions are still saved
+    var conversationId = context.Request.Query["conversationId"].FirstOrDefault()
+        ?? Guid.NewGuid().ToString();
 
     using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
 

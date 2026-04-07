@@ -7,6 +7,8 @@ interface ChatMessage {
   role: 'user' | 'agent';
   text: string;
   source?: 'chat' | 'voice';
+  /** True while the message is still receiving streaming partial transcripts */
+  partial?: boolean;
 }
 
 export default function ChatPanel() {
@@ -28,42 +30,30 @@ export default function ChatPanel() {
   }
 
   const handleVoiceTranscript = useCallback((transcript: VoiceTranscript) => {
+    const msgRole = transcript.role === 'user' ? 'user' as const : 'agent' as const;
+
     setMessages((prev) => {
+      const last = prev[prev.length - 1];
+      const isOngoingPartial = last?.source === 'voice' && last.role === msgRole && last.partial;
+
       if (!transcript.isFinal) {
-        // Streaming partial transcript — update last message of same role if it's a partial
-        const last = prev[prev.length - 1];
-        if (last && last.role === (transcript.role === 'user' ? 'user' : 'agent') && last.source === 'voice') {
+        // Streaming partial — only update if last message is an ongoing partial of the same role
+        if (isOngoingPartial) {
           const next = [...prev];
-          next[next.length - 1] = {
-            role: transcript.role === 'user' ? 'user' : 'agent',
-            text: transcript.text,
-            source: 'voice',
-          };
+          next[next.length - 1] = { role: msgRole, text: transcript.text, source: 'voice', partial: true };
           return next;
         }
-        return [...prev, {
-          role: transcript.role === 'user' ? 'user' : 'agent',
-          text: transcript.text,
-          source: 'voice' as const,
-        }];
+        // New partial → new message bubble
+        return [...prev, { role: msgRole, text: transcript.text, source: 'voice', partial: true }];
       }
 
-      // Final transcript — replace partial or add new
-      const last = prev[prev.length - 1];
-      if (last && last.role === (transcript.role === 'user' ? 'user' : 'agent') && last.source === 'voice') {
+      // Final transcript — finalize the ongoing partial, or add new finalized message
+      if (isOngoingPartial) {
         const next = [...prev];
-        next[next.length - 1] = {
-          role: transcript.role === 'user' ? 'user' : 'agent',
-          text: transcript.text,
-          source: 'voice',
-        };
+        next[next.length - 1] = { role: msgRole, text: transcript.text, source: 'voice', partial: false };
         return next;
       }
-      return [...prev, {
-        role: transcript.role === 'user' ? 'user' : 'agent',
-        text: transcript.text,
-        source: 'voice' as const,
-      }];
+      return [...prev, { role: msgRole, text: transcript.text, source: 'voice', partial: false }];
     });
   }, []);
 
