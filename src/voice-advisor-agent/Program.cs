@@ -32,10 +32,13 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Parse the Voice Live endpoint and deployment from the Foundry connection string
-var voiceConnectionString = builder.Configuration.GetConnectionString("gptrealtime") ?? "";
-var endpoint = ParseConnectionStringValue(voiceConnectionString, "Endpoint");
-var model = ParseConnectionStringValue(voiceConnectionString, "Deployment")
+// Parse the project endpoint and deployment name from Foundry connection strings
+var projectConnectionString = builder.Configuration.GetConnectionString("proj-voice-ski-resort-demo") ?? "";
+var endpoint = ParseConnectionStringValue(projectConnectionString, "Endpoint")
+    ?? ParseConnectionStringValue(projectConnectionString, "EndpointAIInference");
+
+var deploymentConnectionString = builder.Configuration.GetConnectionString("gptrealtime") ?? "";
+var model = ParseConnectionStringValue(deploymentConnectionString, "Deployment")
     ?? builder.Configuration["VoiceLive:Model"]
     ?? "gpt-realtime";
 var voice = builder.Configuration["VoiceLive:Voice"] ?? "en-US-Ava:DragonHDLatestNeural";
