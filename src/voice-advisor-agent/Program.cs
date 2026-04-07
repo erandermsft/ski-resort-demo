@@ -42,7 +42,7 @@ var deploymentConnectionString = builder.Configuration.GetConnectionString("gptr
 var model = ParseConnectionStringValue(deploymentConnectionString, "Deployment")
     ?? builder.Configuration["VoiceLive:Model"]
     ?? "gpt-realtime";
-var voice = builder.Configuration["VoiceLive:Voice"] ?? "alloy";
+var voice = builder.Configuration["VoiceLive:Voice"] ?? "en-US-Ava:DragonHDLatestNeural";
 
 // Connect to downstream agents via A2A
 var agents = new Dictionary<string, AIAgent>();
