@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class SkiCoachAgentExecutor(AgentExecutor):
 
     def __init__(self):
-        self.agent = FoundryChatClient(project_endpoint=os.getenv("GPT41_URI"), credential=AzureCliCredential(), model="gpt-41").as_agent(
+        self.agent = FoundryChatClient(project_endpoint=os.getenv("GPT41_URI"), credential=AzureCliCredential(), model="gpt41").as_agent(
             name="ski-coach-agent",
             instructions="""You are the Ski Coach Agent for AlpineAI ski resort. You help skiers find the best slopes based on their skill level, preferences, and current conditions.
 
