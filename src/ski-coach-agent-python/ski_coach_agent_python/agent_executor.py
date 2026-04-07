@@ -2,13 +2,14 @@
 Ski Coach Agent Executor for A2A SDK.
 """
 import logging
+import os
 from typing import override
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
 from a2a.utils import new_agent_text_message
 
-from agent_framework.azure import AzureOpenAIChatClient
+from agent_framework.foundry import FoundryChatClient
 from azure.identity import AzureCliCredential
 
 from tools.coach_tools import recommend_slope, build_day_plan
@@ -19,7 +20,7 @@ logger = logging.getLogger(__name__)
 class SkiCoachAgentExecutor(AgentExecutor):
 
     def __init__(self):
-        self.agent = AzureOpenAIChatClient(credential=AzureCliCredential()).as_agent(
+        self.agent = FoundryChatClient(project_endpoint=os.getenv("GPT41_URI"), credential=AzureCliCredential(), model="gpt-41").as_agent(
             name="ski-coach-agent",
             instructions="""You are the Ski Coach Agent for AlpineAI ski resort. You help skiers find the best slopes based on their skill level, preferences, and current conditions.
 
