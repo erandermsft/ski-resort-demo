@@ -32,10 +32,12 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Parse the Voice Live endpoint from the Foundry connection string
-var endpoint = ParseVoiceLiveEndpoint(builder.Configuration.GetConnectionString("foundry") ?? "");
-
-var model = builder.Configuration["VoiceLive:Model"] ?? "gpt-realtime";
+// Parse the Voice Live endpoint and deployment from the Foundry connection string
+var voiceConnectionString = builder.Configuration.GetConnectionString("gptrealtime") ?? "";
+var endpoint = ParseConnectionStringValue(voiceConnectionString, "Endpoint");
+var model = ParseConnectionStringValue(voiceConnectionString, "Deployment")
+    ?? builder.Configuration["VoiceLive:Model"]
+    ?? "gpt-realtime";
 var voice = builder.Configuration["VoiceLive:Voice"] ?? "en-US-Ava:DragonHDLatestNeural";
 
 // Connect to downstream agents via A2A
@@ -128,29 +130,20 @@ app.Map("/ws/voice", async (HttpContext context) =>
 app.MapDefaultEndpoints();
 app.Run();
 
-static string ParseVoiceLiveEndpoint(string connectionString)
+static string ParseConnectionStringValue(string connectionString, string key)
 {
-    string? foundEndpoint = null;
-
     foreach (var part in connectionString.Split(';', StringSplitOptions.RemoveEmptyEntries))
     {
         var kv = part.Split('=', 2);
         if (kv.Length != 2) continue;
 
-        var key = kv[0].Trim();
-        var value = kv[1].Trim();
-
-        if (key.Equals("Endpoint", StringComparison.OrdinalIgnoreCase))
-        {
-            foundEndpoint = value.TrimEnd('/');
-        }
+        if (kv[0].Trim().Equals(key, StringComparison.OrdinalIgnoreCase))
+            return kv[1].Trim().TrimEnd('/');
     }
 
-    if (foundEndpoint is not null)
-        return foundEndpoint;
-
-    if (connectionString.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+    if (key.Equals("Endpoint", StringComparison.OrdinalIgnoreCase)
+        && connectionString.StartsWith("http", StringComparison.OrdinalIgnoreCase))
         return connectionString.TrimEnd('/');
 
-    return "https://localhost";
+    return null!;
 }
