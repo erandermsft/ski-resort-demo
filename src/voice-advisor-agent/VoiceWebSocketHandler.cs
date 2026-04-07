@@ -250,6 +250,8 @@ public sealed class VoiceWebSocketHandler
         }
     }
 
+    private string _currentAssistantTranscript = "";
+
     private async Task ProcessVoiceLiveEvents(VoiceLiveSession session, CancellationToken cancellationToken)
     {
         Dictionary<string, object>? pendingFunctionCall = null;
@@ -287,6 +289,7 @@ public sealed class VoiceWebSocketHandler
 
                     case SessionUpdateResponseCreated:
                         _logger.LogDebug("Response created");
+                        _currentAssistantTranscript = "";
                         break;
 
                     case SessionUpdateResponseAudioDelta audioDelta:
@@ -300,11 +303,12 @@ public sealed class VoiceWebSocketHandler
                     case SessionUpdateResponseAudioTranscriptDelta transcriptDelta:
                         if (!string.IsNullOrEmpty(transcriptDelta.Delta))
                         {
+                            _currentAssistantTranscript += transcriptDelta.Delta;
                             await SendToClient(new
                             {
                                 type = "transcript",
                                 role = "assistant",
-                                text = transcriptDelta.Delta,
+                                text = _currentAssistantTranscript,
                                 final_ = false
                             }, cancellationToken);
                         }
