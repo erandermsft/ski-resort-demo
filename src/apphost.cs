@@ -6,6 +6,7 @@
 
 #:project ./advisor-agent-dotnet/AdvisorAgent.Dotnet.csproj
 #:project ./lift-traffic-agent-dotnet/LiftTrafficAgent.Dotnet.csproj
+#:project ./voice-advisor-agent/VoiceAdvisorAgent.csproj
 
 using Aspire.Hosting.Foundry;
 
@@ -28,6 +29,7 @@ var cosmos = builder.AddAzureCosmosDB("cosmos-db")
         });
 var db = cosmos.AddCosmosDatabase("db");
 var conversations = db.AddContainer("conversations", "/conversationId");
+var sessions = db.AddContainer("sessions", "/conversationId");
 
 // ---------------------------------------------------------------------------
 // Data Generator (Python)
@@ -79,6 +81,18 @@ var liftAgent = builder.AddProject<Projects.LiftTrafficAgent_Dotnet>("lift-traff
 var advisorAgent = builder.AddProject<Projects.AdvisorAgent_Dotnet>("advisor-agent-dotnet")
     .WithReference(deployment).WaitFor(deployment)
     .WithReference(conversations).WaitFor(conversations)
+    .WithReference(sessions).WaitFor(sessions)
+    .WithReference(weatherAgent).WaitFor(weatherAgent)
+    .WithReference(liftAgent).WaitFor(liftAgent)
+    .WithReference(safetyAgent).WaitFor(safetyAgent)
+    .WithReference(coachAgent).WaitFor(coachAgent);
+
+// ---------------------------------------------------------------------------
+// Voice Advisor Agent (.NET) — Voice orchestrator via WebSocket + Voice Live
+// ---------------------------------------------------------------------------
+var voiceAdvisorAgent = builder.AddProject<Projects.VoiceAdvisorAgent>("voice-advisor-agent")
+    .WithReference(deployment).WaitFor(deployment)
+    .WithReference(conversations).WaitFor(conversations)
     .WithReference(weatherAgent).WaitFor(weatherAgent)
     .WithReference(liftAgent).WaitFor(liftAgent)
     .WithReference(safetyAgent).WaitFor(safetyAgent)
@@ -89,6 +103,7 @@ var advisorAgent = builder.AddProject<Projects.AdvisorAgent_Dotnet>("advisor-age
 // ---------------------------------------------------------------------------
 builder.AddViteApp("frontend", "./frontend", "dev")
     .WithReference(advisorAgent).WaitFor(advisorAgent)
+    .WithReference(voiceAdvisorAgent).WaitFor(voiceAdvisorAgent)
     .WithReference(dataGenerator).WaitFor(dataGenerator)
     .WithUrls((e) =>
     {

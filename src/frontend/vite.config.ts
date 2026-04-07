@@ -18,6 +18,12 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      '/ws/voice': {
+        target: process.env.VOICE_ADVISOR_AGENT_HTTPS || process.env.VOICE_ADVISOR_AGENT_HTTP,
+        changeOrigin: true,
+        secure: false,
+        ws: true,
+      },
     },
   },
 })

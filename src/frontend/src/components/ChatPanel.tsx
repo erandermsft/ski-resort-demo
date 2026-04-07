@@ -1,9 +1,12 @@
-import { useState, useRef, useEffect, type FormEvent } from 'react';
+import { useState, useRef, useEffect, useCallback, type FormEvent } from 'react';
 import { sendMessageStream, resetClient } from '../lib/a2a-client';
+import type { VoiceTranscript } from '../lib/VoiceSession';
+import VoiceButton from './VoiceButton';
 
 interface ChatMessage {
   role: 'user' | 'agent';
   text: string;
+  source?: 'chat' | 'voice';
 }
 
 export default function ChatPanel() {
@@ -24,17 +27,57 @@ export default function ChatPanel() {
     resetClient();
   }
 
+  const handleVoiceTranscript = useCallback((transcript: VoiceTranscript) => {
+    setMessages((prev) => {
+      if (!transcript.isFinal) {
+        // Streaming partial transcript — update last message of same role if it's a partial
+        const last = prev[prev.length - 1];
+        if (last && last.role === (transcript.role === 'user' ? 'user' : 'agent') && last.source === 'voice') {
+          const next = [...prev];
+          next[next.length - 1] = {
+            role: transcript.role === 'user' ? 'user' : 'agent',
+            text: transcript.text,
+            source: 'voice',
+          };
+          return next;
+        }
+        return [...prev, {
+          role: transcript.role === 'user' ? 'user' : 'agent',
+          text: transcript.text,
+          source: 'voice' as const,
+        }];
+      }
+
+      // Final transcript — replace partial or add new
+      const last = prev[prev.length - 1];
+      if (last && last.role === (transcript.role === 'user' ? 'user' : 'agent') && last.source === 'voice') {
+        const next = [...prev];
+        next[next.length - 1] = {
+          role: transcript.role === 'user' ? 'user' : 'agent',
+          text: transcript.text,
+          source: 'voice',
+        };
+        return next;
+      }
+      return [...prev, {
+        role: transcript.role === 'user' ? 'user' : 'agent',
+        text: transcript.text,
+        source: 'voice' as const,
+      }];
+    });
+  }, []);
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const text = input.trim();
     if (!text || loading) return;
 
     setInput('');
-    setMessages((prev) => [...prev, { role: 'user', text }]);
+    setMessages((prev) => [...prev, { role: 'user', text, source: 'chat' }]);
     setLoading(true);
     accRef.current = '';
 
-    setMessages((prev) => [...prev, { role: 'agent', text: '' }]);
+    setMessages((prev) => [...prev, { role: 'agent', text: '', source: 'chat' }]);
 
     try {
       for await (const event of sendMessageStream(text, contextId)) {
@@ -46,7 +89,7 @@ export default function ChatPanel() {
           const snapshot = accRef.current;
           setMessages((prev) => {
             const next = [...prev];
-            next[next.length - 1] = { role: 'agent', text: snapshot };
+            next[next.length - 1] = { role: 'agent', text: snapshot, source: 'chat' };
             return next;
           });
         }
@@ -57,6 +100,7 @@ export default function ChatPanel() {
           next[next.length - 1] = {
             role: 'agent',
             text: '(No response from advisor)',
+            source: 'chat',
           };
           return next;
         });
@@ -68,6 +112,7 @@ export default function ChatPanel() {
         next[next.length - 1] = {
           role: 'agent',
           text: `Error: ${err instanceof Error ? err.message : 'Connection failed'}`,
+          source: 'chat',
         };
         return next;
       });
@@ -82,20 +127,27 @@ export default function ChatPanel() {
         <h2 className="text-lg font-semibold text-violet-300">
           🤖 AI Advisor
         </h2>
-        <button
-          onClick={handleNewConversation}
-          disabled={loading}
-          className="text-xs px-3 py-1.5 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 hover:text-white disabled:opacity-50 transition-colors"
-        >
-          + New Chat
-        </button>
+        <div className="flex items-center gap-2">
+          <VoiceButton
+            onTranscript={handleVoiceTranscript}
+            disabled={loading}
+            conversationId={contextId}
+          />
+          <button
+            onClick={handleNewConversation}
+            disabled={loading}
+            className="text-xs px-3 py-1.5 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 hover:text-white disabled:opacity-50 transition-colors"
+          >
+            + New Chat
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 space-y-3">
         {messages.length === 0 && (
           <p className="text-slate-500 text-sm pt-8 text-center">
             Ask the AlpineAI advisor about conditions, recommendations, or
-            safety info.
+            safety info — by text or voice.
           </p>
         )}
         {messages.map((msg, i) => (
@@ -110,6 +162,9 @@ export default function ChatPanel() {
                   : 'bg-slate-700 text-slate-200'
               }`}
             >
+              {msg.source === 'voice' && (
+                <span className="text-[10px] opacity-60 mr-1">🎙️</span>
+              )}
               {msg.text || (loading && i === messages.length - 1 ? 'thinking…' : '')}
             </div>
           </div>
