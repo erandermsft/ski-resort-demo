@@ -237,10 +237,28 @@ public sealed class VoiceWebSocketHandler
 
         try
         {
-            await foreach (var update in session.GetUpdatesAsync(cancellationToken))
+            // Use manual enumerator to handle SDK deserialization bugs (e.g. session.created
+            // VoiceProvider field returned as string instead of object). Catching per-event
+            // lets us skip problematic events while processing the rest of the stream.
+            var enumerator = session.GetUpdatesAsync(cancellationToken).GetAsyncEnumerator(cancellationToken);
+            try
             {
-                switch (update)
+                while (true)
                 {
+                    SessionUpdate update;
+                    try
+                    {
+                        if (!await enumerator.MoveNextAsync()) break;
+                        update = enumerator.Current;
+                    }
+                    catch (InvalidOperationException ex) when (ex.Message.Contains("element of type"))
+                    {
+                        _logger.LogWarning("Skipping Voice Live event with deserialization error: {Message}", ex.Message);
+                        continue;
+                    }
+
+                    switch (update)
+                    {
                     case SessionUpdateSessionUpdated:
                         _logger.LogInformation("Voice Live session updated and ready");
                         await session.StartResponseAsync(cancellationToken);
@@ -356,6 +374,11 @@ public sealed class VoiceWebSocketHandler
                         await SendToClient(new { type = "error", message = errorUpdate.Error.Message }, cancellationToken);
                         break;
                 }
+                }
+            }
+            finally
+            {
+                await enumerator.DisposeAsync();
             }
         }
         catch (OperationCanceledException) { }
