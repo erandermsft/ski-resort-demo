@@ -11,6 +11,8 @@ export interface VoiceSessionCallbacks {
     onStatus: (status: VoiceStatus, detail?: string) => void;
     onError: (message: string) => void;
     onConversationId?: (id: string) => void;
+    /** Called when the server clears the audio queue (e.g. agent interrupted) */
+    onClearAudio?: () => void;
 }
 
 const PCM_SAMPLE_RATE = 24000;
@@ -194,6 +196,7 @@ export class VoiceSession {
 
                 case 'clear_audio':
                     this.clearPlaybackQueue();
+                    this.callbacks.onClearAudio?.();
                     break;
 
                 case 'transcript':

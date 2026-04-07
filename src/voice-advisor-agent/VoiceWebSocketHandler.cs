@@ -1,8 +1,6 @@
-using System.ClientModel.Primitives;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using Azure.AI.VoiceLive;
 using Azure.Core;
 using Microsoft.Agents.AI;
@@ -13,6 +11,8 @@ namespace VoiceAdvisorAgent;
 
 /// <summary>
 /// Handles a single voice session, bridging a browser WebSocket to a Voice Live session.
+/// Delegates conversation persistence to <see cref="VoiceConversationStore"/> and
+/// telemetry emission to <see cref="VoiceSessionTraceEmitter"/>.
 /// </summary>
 public sealed class VoiceWebSocketHandler
 {
@@ -28,6 +28,7 @@ public sealed class VoiceWebSocketHandler
     private readonly VoiceConversationStore? _conversationStore;
     private readonly VoiceSessionTraceEmitter _traceEmitter;
 
+    // Conversation tracking for post-hoc telemetry and persistence
     private readonly List<ConversationMessage> _messages = new();
     private readonly List<ToolExecution> _toolExecutions = new();
     private readonly List<ToolDefinitionInfo> _toolDefinitions = new();
@@ -72,7 +73,7 @@ public sealed class VoiceWebSocketHandler
 
             await ConfigureSessionAsync(session, _instructions);
             await InjectConversationHistoryAsync(session, cancellationToken);
-            await SendToClient(new { type = "ready", conversationId = _conversationId }, cancellationToken);
+            await SendToClient(new { type = "ready" }, cancellationToken);
 
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
@@ -104,10 +105,12 @@ public sealed class VoiceWebSocketHandler
 
     private async Task ConfigureSessionAsync(VoiceLiveSession session, string instructions)
     {
+        // Convert A2A agents to Voice Live tool definitions (analogous to agent.AsAIFunction() in MAF)
         var functionTools = _a2aAgents.Values
             .Select(agent => agent.AsVoiceLiveTool())
             .ToList();
 
+        // Collect tool definitions for telemetry
         foreach (var tool in functionTools)
         {
             _toolDefinitions.Add(new ToolDefinitionInfo(
@@ -116,53 +119,39 @@ public sealed class VoiceWebSocketHandler
                 tool.Parameters?.ToString() ?? "{}"));
         }
 
-        // Build session config as raw JSON so we can send voice as a plain string,
-        // which is what the OpenAI Realtime API format expects.
-        var toolsArray = new JsonArray();
-        foreach (var tool in functionTools)
+        var options = new VoiceLiveSessionOptions
         {
-            var toolNode = new JsonObject
+            Model = _model,
+            Instructions = instructions,
+            Voice = new AzureStandardVoice(_voice),
+            InputAudioFormat = InputAudioFormat.Pcm16,
+            OutputAudioFormat = OutputAudioFormat.Pcm16,
+            TurnDetection = new AzureSemanticVadTurnDetection
             {
-                ["type"] = "function",
-                ["name"] = tool.Name,
-                ["description"] = tool.Description ?? ""
-            };
-            if (tool.Parameters is not null)
-                toolNode["parameters"] = JsonNode.Parse(tool.Parameters.ToString());
-            toolsArray.Add(toolNode);
-        }
-
-        var sessionConfig = new JsonObject
-        {
-            ["type"] = "session.update",
-            ["session"] = new JsonObject
-            {
-                ["modalities"] = new JsonArray("text", "audio"),
-                ["model"] = _model,
-                ["instructions"] = instructions,
-                ["voice"] = _voice,
-                ["input_audio_format"] = "pcm16",
-                ["output_audio_format"] = "pcm16",
-                ["turn_detection"] = new JsonObject
-                {
-                    ["type"] = "server_vad",
-                    ["threshold"] = 0.5,
-                    ["prefix_padding_ms"] = 300,
-                    ["silence_duration_ms"] = 500
-                },
-                ["input_audio_transcription"] = new JsonObject
-                {
-                    ["model"] = "whisper-1"
-                },
-                ["tools"] = toolsArray,
-                ["tool_choice"] = "auto"
-            }
+                Threshold = 0.5f,
+                PrefixPadding = TimeSpan.FromMilliseconds(300),
+                SilenceDuration = TimeSpan.FromMilliseconds(500),
+            },
+            InputAudioEchoCancellation = new AudioEchoCancellation(),
+            InputAudioNoiseReduction = new AudioNoiseReduction(AudioNoiseReductionType.AzureDeepNoiseSuppression),
+            ToolChoice = ToolChoiceLiteral.Auto,
+            InputAudioTranscription = new AudioInputTranscriptionOptions(AudioInputTranscriptionOptionsModel.Whisper1)
         };
 
-        await session.SendCommandAsync(BinaryData.FromString(sessionConfig.ToJsonString()));
+        options.Modalities.Clear();
+        options.Modalities.Add(InteractionModality.Text);
+        options.Modalities.Add(InteractionModality.Audio);
+
+        foreach (var tool in functionTools)
+            options.Tools.Add(tool);
+
+        await session.ConfigureSessionAsync(options);
         _logger.LogInformation("Voice Live session configured with {ToolCount} tools", functionTools.Count);
     }
 
+    /// <summary>
+    /// Injects previous conversation history as native conversation items.
+    /// </summary>
     private async Task InjectConversationHistoryAsync(VoiceLiveSession session, CancellationToken cancellationToken)
     {
         if (_conversationId is null || _conversationStore is null) return;
@@ -250,26 +239,16 @@ public sealed class VoiceWebSocketHandler
         }
     }
 
-    private string _currentAssistantTranscript = "";
-
     private async Task ProcessVoiceLiveEvents(VoiceLiveSession session, CancellationToken cancellationToken)
     {
         Dictionary<string, object>? pendingFunctionCall = null;
 
         try
         {
-            await foreach (var rawMessage in session.ReceiveUpdatesAsync(cancellationToken))
+            await foreach (var update in session.GetUpdatesAsync(cancellationToken))
             {
-                var fixedMessage = FixVoiceProviderField(rawMessage);
-                var update = ModelReaderWriter.Read<SessionUpdate>(fixedMessage);
-                if (update is null) continue;
-
                 switch (update)
                 {
-                    case SessionUpdateSessionCreated:
-                        _logger.LogInformation("Voice Live session created");
-                        break;
-
                     case SessionUpdateSessionUpdated:
                         _logger.LogInformation("Voice Live session updated and ready");
                         await session.StartResponseAsync(cancellationToken);
@@ -289,7 +268,6 @@ public sealed class VoiceWebSocketHandler
 
                     case SessionUpdateResponseCreated:
                         _logger.LogDebug("Response created");
-                        _currentAssistantTranscript = "";
                         break;
 
                     case SessionUpdateResponseAudioDelta audioDelta:
@@ -303,12 +281,11 @@ public sealed class VoiceWebSocketHandler
                     case SessionUpdateResponseAudioTranscriptDelta transcriptDelta:
                         if (!string.IsNullOrEmpty(transcriptDelta.Delta))
                         {
-                            _currentAssistantTranscript += transcriptDelta.Delta;
                             await SendToClient(new
                             {
                                 type = "transcript",
                                 role = "assistant",
-                                text = _currentAssistantTranscript,
+                                text = transcriptDelta.Delta,
                                 final_ = false
                             }, cancellationToken);
                         }
@@ -479,45 +456,5 @@ public sealed class VoiceWebSocketHandler
         {
             _logger.LogError(ex, "Error sending to client WebSocket");
         }
-    }
-
-    /// <summary>
-    /// Fixes the voice field in any event that contains it as a plain string.
-    /// The server returns <c>"voice": "alloy"</c> (a string) but the C# SDK expects
-    /// an object like <c>{"type": "azure-standard", "name": "..."}</c>.
-    /// Scans both "session" and "response" sub-objects in every event.
-    /// </summary>
-    private BinaryData FixVoiceProviderField(BinaryData message)
-    {
-        try
-        {
-            var node = JsonNode.Parse(message);
-            if (node is not JsonObject root) return message;
-
-            bool modified = FixVoiceInObject(root["session"] as JsonObject)
-                          | FixVoiceInObject(root["response"] as JsonObject);
-
-            return modified ? BinaryData.FromString(root.ToJsonString()) : message;
-        }
-        catch
-        {
-            return message;
-        }
-    }
-
-    private static bool FixVoiceInObject(JsonObject? obj)
-    {
-        if (obj is null) return false;
-
-        var voiceNode = obj["voice"];
-        if (voiceNode is null || voiceNode is JsonObject) return false;
-
-        var voiceString = voiceNode.GetValue<string>();
-        obj["voice"] = new JsonObject
-        {
-            ["type"] = "azure-standard",
-            ["name"] = voiceString
-        };
-        return true;
     }
 }

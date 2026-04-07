@@ -32,17 +32,12 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Parse the project endpoint and deployment name from Foundry connection strings
-var projectConnectionString = "https://aif-voice-ski-resort-dem.cognitiveservices.azure.com/openai/realtime?api-version=2024-10-01-preview&deployment=gptrealtime";
-// var endpoint = ParseConnectionStringValue(projectConnectionString, "Endpoint")
-//     ?? ParseConnectionStringValue(projectConnectionString, "EndpointAIInference");
-var endpoint = projectConnectionString;
+// Parse the Voice Live endpoint from the Foundry connection string
+// Voice Live needs the cognitiveservices.azure.com endpoint (the "Endpoint" key)
+var endpoint = ParseVoiceLiveEndpoint(builder.Configuration.GetConnectionString("gptrealtime") ?? "");
 
-var deploymentConnectionString = builder.Configuration.GetConnectionString("gptrealtime") ?? "";
-var model = ParseConnectionStringValue(deploymentConnectionString, "Deployment")
-    ?? builder.Configuration["VoiceLive:Model"]
-    ?? "gpt-realtime";
-var voice = builder.Configuration["VoiceLive:Voice"] ?? "alloy";
+var model = builder.Configuration["VoiceLive:Model"] ?? "gpt-realtime";
+var voice = builder.Configuration["VoiceLive:Voice"] ?? "en-US-Ava:DragonHDLatestNeural";
 
 // Connect to downstream agents via A2A
 var agents = new Dictionary<string, AIAgent>();
@@ -136,20 +131,31 @@ app.Map("/ws/voice", async (HttpContext context) =>
 app.MapDefaultEndpoints();
 app.Run();
 
-static string ParseConnectionStringValue(string connectionString, string key)
+static string ParseVoiceLiveEndpoint(string connectionString)
 {
+    // Voice Live requires the cognitiveservices.azure.com endpoint (the "Endpoint" key)
+    string? endpoint = null;
+
     foreach (var part in connectionString.Split(';', StringSplitOptions.RemoveEmptyEntries))
     {
         var kv = part.Split('=', 2);
         if (kv.Length != 2) continue;
 
-        if (kv[0].Trim().Equals(key, StringComparison.OrdinalIgnoreCase))
-            return kv[1].Trim().TrimEnd('/');
+        var key = kv[0].Trim();
+        var value = kv[1].Trim();
+
+        if (key.Equals("Endpoint", StringComparison.OrdinalIgnoreCase))
+        {
+            endpoint = value.TrimEnd('/');
+        }
     }
 
-    if (key.Equals("Endpoint", StringComparison.OrdinalIgnoreCase)
-        && connectionString.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+    if (endpoint is not null)
+        return endpoint;
+
+    // If no key=value format, treat the whole string as a URL
+    if (connectionString.StartsWith("http", StringComparison.OrdinalIgnoreCase))
         return connectionString.TrimEnd('/');
 
-    return null!;
+    return "https://localhost";
 }

@@ -20,6 +20,10 @@ export default function ChatPanel() {
   const endRef = useRef<HTMLDivElement>(null);
   const accRef = useRef('');
   const initRef = useRef(false);
+  /** Tracks the messages-array index of the active streaming bubble for each voice role */
+  const partialIndexRef = useRef<{ user?: number; agent?: number }>({});
+  /** Accumulated text for the active voice bubble — source of truth, avoids double-append in Strict Mode */
+  const voiceAccRef = useRef<{ user: string; agent: string }>({ user: '', agent: '' });
 
   // Keep ref in sync with state so voice callbacks always have the latest value
   useEffect(() => { contextIdRef.current = contextId; }, [contextId]);
@@ -62,6 +66,8 @@ export default function ChatPanel() {
     setMessages([]);
     setContextId(undefined);
     initRef.current = false;
+    partialIndexRef.current = {};
+    voiceAccRef.current = { user: '', agent: '' };
     resetClient();
     // Re-trigger greeting
     (async () => {
@@ -93,28 +99,52 @@ export default function ChatPanel() {
   const handleVoiceTranscript = useCallback((transcript: VoiceTranscript) => {
     const msgRole = transcript.role === 'user' ? 'user' as const : 'agent' as const;
 
-    setMessages((prev) => {
-      const last = prev[prev.length - 1];
-      const isOngoingPartial = last?.source === 'voice' && last.role === msgRole && last.partial;
+    const currentIdx = partialIndexRef.current[msgRole];
 
-      if (!transcript.isFinal) {
-        // Streaming partial — only update if last message is an ongoing partial of the same role
-        if (isOngoingPartial) {
+    if (transcript.isFinal) {
+      // Final message carries the complete text — just seal the existing bubble (or create one)
+      partialIndexRef.current[msgRole] = undefined;
+      voiceAccRef.current[msgRole] = '';
+
+      setMessages((prev) => {
+        const hasOpenBubble = currentIdx !== undefined && currentIdx < prev.length && prev[currentIdx].partial;
+        if (hasOpenBubble) {
+          // Keep the text we already accumulated — ignore the final's text to avoid duplication
           const next = [...prev];
-          next[next.length - 1] = { role: msgRole, text: transcript.text, source: 'voice', partial: true };
+          next[currentIdx] = { ...next[currentIdx], partial: false };
           return next;
         }
-        // New partial → new message bubble
-        return [...prev, { role: msgRole, text: transcript.text, source: 'voice', partial: true }];
-      }
+        // No open bubble — use the final text as-is
+        return [...prev, { role: msgRole, text: transcript.text, source: 'voice', partial: false }];
+      });
+      return;
+    }
 
-      // Final transcript — finalize the ongoing partial, or add new finalized message
-      if (isOngoingPartial) {
+    // Partial delta — append to accumulator, write snapshot to state
+    voiceAccRef.current[msgRole] += transcript.text;
+    const snapshot = voiceAccRef.current[msgRole];
+
+    setMessages((prev) => {
+      const hasOpenBubble = currentIdx !== undefined && currentIdx < prev.length && prev[currentIdx].partial;
+      if (hasOpenBubble) {
         const next = [...prev];
-        next[next.length - 1] = { role: msgRole, text: transcript.text, source: 'voice', partial: false };
+        next[currentIdx] = { role: msgRole, text: snapshot, source: 'voice', partial: true };
         return next;
       }
-      return [...prev, { role: msgRole, text: transcript.text, source: 'voice', partial: false }];
+      partialIndexRef.current[msgRole] = prev.length;
+      return [...prev, { role: msgRole, text: snapshot, source: 'voice', partial: true }];
+    });
+  }, []);
+
+  /** When the server clears audio (agent interrupted), discard any stale agent partial */
+  const handleClearAudio = useCallback(() => {
+    const agentIdx = partialIndexRef.current.agent;
+    if (agentIdx === undefined) return;
+    partialIndexRef.current.agent = undefined;
+    voiceAccRef.current.agent = '';
+    setMessages((prev) => {
+      if (agentIdx >= prev.length || !prev[agentIdx].partial) return prev;
+      return prev.filter((_, i) => i !== agentIdx);
     });
   }, []);
 
@@ -181,6 +211,7 @@ export default function ChatPanel() {
         <div className="flex items-center gap-2">
           <VoiceButton
             onTranscript={handleVoiceTranscript}
+            onClearAudio={handleClearAudio}
             disabled={loading || !contextId}
             conversationId={contextId}
           />
