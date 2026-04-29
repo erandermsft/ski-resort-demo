@@ -9,25 +9,17 @@ interface ResponseStreamPayload {
   type?: string;
   delta?: string;
   response?: { id?: string; output_text?: string; conversation?: { id?: string } };
-  item?: { id?: string; content?: Array<{ text?: string; type?: string }> };
+  item?: { id?: string; type?: string; role?: string; content?: Array<{ text?: string; type?: string }> };
   content_index?: number;
   output_index?: number;
 }
 
 function extractContent(payload: ResponseStreamPayload): string | undefined {
-  if (typeof payload.delta === 'string') {
+  if (payload.type === 'response.output_text.delta' && typeof payload.delta === 'string') {
     return payload.delta;
   }
 
-  if (typeof payload.response?.output_text === 'string') {
-    return payload.response.output_text;
-  }
-
-  const textParts = payload.item?.content
-    ?.map((part) => part.text)
-    .filter((text): text is string => typeof text === 'string' && text.length > 0);
-
-  return textParts?.join('');
+  return undefined;
 }
 
 function extractContextId(payload: ResponseStreamPayload): string | undefined {
