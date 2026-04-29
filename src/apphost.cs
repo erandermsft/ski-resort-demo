@@ -23,7 +23,7 @@ var voiceDeployment = project.AddModelDeployment("gptrealtime", FoundryModel.Ope
 
 var webSearch = project.AddWebSearchTool("web-search");
 
-project.AddPromptAgent(deployment, name: "ski-researcher",
+var skiResearcher =project.AddPromptAgent(deployment, name: "ski-researcher",
     instructions: """You are a ski researcher agent. Your job is to research and provide information about ski.""")
     .WithTool(webSearch);
 
@@ -95,6 +95,7 @@ var advisorAgent = builder.AddProject<Projects.AdvisorAgent_Dotnet>("advisor-age
     .WithReference(liftAgent).WaitFor(liftAgent)
     .WithReference(safetyAgent).WaitFor(safetyAgent)
     .WithReference(coachAgent).WaitFor(coachAgent)
+    .WithReference(skiResearcher).WaitFor(skiResearcher)
     .PublishAsHostedAgent();
 
 // ---------------------------------------------------------------------------
