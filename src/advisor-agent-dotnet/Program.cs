@@ -16,6 +16,14 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 
+builder.AddAzureChatCompletionsClient(connectionName: "gpt41",
+    configureSettings: settings =>
+    {
+        settings.TokenCredential = new DefaultAzureCredential();
+        settings.EnableSensitiveTelemetryData = true;
+    })
+    .AddChatClient().ConfigureOptions(options => options.AllowMultipleToolCalls = true);
+
 var projectConnectionString = Environment.GetEnvironmentVariable("ConnectionStrings__proj-voice-ski-resort-demo")
     ?? throw new InvalidOperationException("ConnectionStrings__proj-voice-ski-resort-demo is not set.");
 var chatConnectionString = Environment.GetEnvironmentVariable("ConnectionStrings__gpt41")
@@ -114,56 +122,75 @@ Examples:
 When you DO call agents, synthesize their responses into one clear answer. Mention any safety concerns prominently. Be friendly, concise, and helpful.";
 
 // Register the Foundry-hosted orchestrator agent that uses all 4 remote A2A agents as tools.
-// var chatClientAgent = builder.AddAIAgent("advisor-agent", (sp, key) =>
-// {
-//     var agentOptions = new ChatClientAgentOptions
-//     {
-//         Name = key,
-//         Description = "AlpineAI Ski Resort Advisor - your intelligent ski concierge",
-//         ChatOptions = new ChatOptions
-//         {
-//             ModelId = deploymentName,
-//             Instructions = AdvisorInstructions,
-//             Tools = [
-//                 weatherAgent.AsAIFunction(),
-//                 liftAgent.AsAIFunction(),
-//                 safetyAgent.AsAIFunction(),
-//                 coachAgent.AsAIFunction()
-//             ]
-//         },
-//     }.WithCosmosChatHistoryProvider(sp);
-
-//     var agent = new AIProjectClient(projectUri, credential).AsAIAgent(agentOptions, services: sp);
-
-//     var ficc = agent.GetService<FunctionInvokingChatClient>();
-//     ficc?.AllowConcurrentInvocation = true;
-
-//     return agent;
-// });
-
-var agentOptions = new ChatClientAgentOptions
+var advisorAgentBuilder = builder.AddAIAgent("advisor-agent", (sp, key) =>
 {
-    Name = "advisor-agent",
-    Description = "AlpineAI Ski Resort Advisor - your intelligent ski concierge",
-    ChatOptions = new ChatOptions
+    var chatClient = sp.GetRequiredService<IChatClient>();
+
+    var agentOptions = new ChatClientAgentOptions()
     {
-        ModelId = deploymentName,
-        Instructions = AdvisorInstructions,
-        Tools = [
-            weatherAgent.AsAIFunction(),
-            liftAgent.AsAIFunction(),
-            safetyAgent.AsAIFunction(),
-            coachAgent.AsAIFunction()
-        ]
-    },
-};
+        Name = key,
+        Description = "AlpineAI Ski Resort Advisor - your intelligent ski concierge",
+        ChatOptions = new ChatOptions()
+        {
+            Instructions = @"You are the Ski Resort Advisor, the main AI concierge for AlpineAI ski resort.
 
-var agent = new AIProjectClient(projectUri, credential).AsAIAgent(agentOptions);
+You have access to four specialist agents as tools:
+- Weather Agent: current conditions, forecasts, storm alerts
+- Lift Traffic Agent: lift status, wait times, congestion
+- Safety Agent: risk evaluation, slope safety, closures
+- Ski Coach Agent: personalized slope recommendations, day plans
 
-var ficc = agent.GetService<FunctionInvokingChatClient>();
-ficc?.AllowConcurrentInvocation = true;
+IMPORTANT: Only call the agents that are relevant to the user's question. Do NOT call all agents for every question.
 
-builder.Services.AddFoundryResponses(agent);
+Examples:
+- ""What's the weather like?"" → call Weather Agent only
+- ""Which lifts are open?"" → call Lift Traffic Agent only
+- ""Is it safe to ski today?"" → call Safety Agent (and Weather Agent if you need conditions context)
+- ""I'm a beginner, where should I ski?"" → call Ski Coach Agent
+- ""Plan my full day"" → call multiple agents as needed
+- ""Hi"" or ""Thanks"" → respond directly, no agent calls needed
+
+When you DO call agents, synthesize their responses into one clear answer. Mention any safety concerns prominently. Be friendly, concise, and helpful.",
+            Tools = [
+                weatherAgent.AsAIFunction(),
+                liftAgent.AsAIFunction(),
+                safetyAgent.AsAIFunction(),
+                coachAgent.AsAIFunction()
+            ]
+        },
+    }.WithCosmosChatHistoryProvider(sp);
+
+    var agent = chatClient.AsAIAgent(agentOptions, services: sp);
+
+    var ficc = agent.GetService<FunctionInvokingChatClient>();
+    ficc?.AllowConcurrentInvocation = true;
+
+    return agent;
+}).WithCosmosSessionStore();
+
+// var agentOptions = new ChatClientAgentOptions
+// {
+//     Name = "advisor-agent",
+//     Description = "AlpineAI Ski Resort Advisor - your intelligent ski concierge",
+//     ChatOptions = new ChatOptions
+//     {
+//         ModelId = deploymentName,
+//         Instructions = AdvisorInstructions,
+//         Tools = [
+//             weatherAgent.AsAIFunction(),
+//             liftAgent.AsAIFunction(),
+//             safetyAgent.AsAIFunction(),
+//             coachAgent.AsAIFunction()
+//         ]
+//     },
+// };
+
+// var agent = new AIProjectClient(projectUri, credential).AsAIAgent(agentOptions);
+
+// var ficc = agent.GetService<FunctionInvokingChatClient>();
+// ficc?.AllowConcurrentInvocation = true;
+
+builder.Services.AddFoundryResponses();
 
 var app = builder.Build();
 
