@@ -19,11 +19,20 @@ builder.AddAzureChatCompletionsClient(connectionName: "gpt41",
     })
     .AddChatClient().ConfigureOptions(options => options.AllowMultipleToolCalls = true);
 
-// Register Cosmos for conversation storage
+// Register Cosmos containers for session storage
+builder.AddKeyedAzureCosmosContainer("sessions",
+    configureClientOptions: (option) => option.Serializer = new CosmosSystemTextJsonSerializer());
+
+// Register Cosmos containers for conversation storage
 builder.AddKeyedAzureCosmosContainer("conversations",
     configureClientOptions: (option) => option.Serializer = new CosmosSystemTextJsonSerializer());
-builder.Services.AddSingleton<ICosmosThreadRepository, CosmosThreadRepository>();
-builder.Services.AddSingleton<CosmosAgentSessionStore>();
+
+// Register session and chat history providers
+builder.Services.AddCosmosAgentSessionStore("sessions", opt => { opt.TtlSeconds = 86400 * 7; });
+builder.Services.AddCosmosChatHistoryProvider("conversations", (sp, opt) =>
+{
+    opt.MessageTtlSeconds = 86400 * 7;
+});
 
 // Configure CORS
 builder.Services.AddCors(options =>
@@ -60,8 +69,13 @@ builder.AddAIAgent("advisor-agent", (sp, key) =>
 {
     var chatClient = sp.GetRequiredService<IChatClient>();
 
-    var agent = chatClient.AsAIAgent(
-        instructions: @"You are the Ski Resort Advisor, the main AI concierge for AlpineAI ski resort.
+    var agentOptions = new ChatClientAgentOptions()
+    {
+        Name = key,
+        Description = "AlpineAI Ski Resort Advisor - your intelligent ski concierge",
+        ChatOptions = new ChatOptions()
+        {
+            Instructions = @"You are the Ski Resort Advisor, the main AI concierge for AlpineAI ski resort.
 
 You have access to four specialist agents as tools:
 - Weather Agent: current conditions, forecasts, storm alerts
@@ -80,21 +94,22 @@ Examples:
 - ""Hi"" or ""Thanks"" → respond directly, no agent calls needed
 
 When you DO call agents, synthesize their responses into one clear answer. Mention any safety concerns prominently. Be friendly, concise, and helpful.",
-        description: "AlpineAI Ski Resort Advisor - your intelligent ski concierge",
-        name: key,
-        tools: [
-            weatherAgent.AsAIFunction(),
-            liftAgent.AsAIFunction(),
-            safetyAgent.AsAIFunction(),
-            coachAgent.AsAIFunction()
-        ]
-    );
+            Tools = [
+                weatherAgent.AsAIFunction(),
+                liftAgent.AsAIFunction(),
+                safetyAgent.AsAIFunction(),
+                coachAgent.AsAIFunction()
+            ]
+        },
+    }.WithCosmosChatHistoryProvider(sp);
+
+    var agent = chatClient.AsAIAgent(agentOptions, services: sp);
 
     var ficc = agent.GetService<FunctionInvokingChatClient>();
     ficc?.AllowConcurrentInvocation = true;
 
     return agent;
-}).WithSessionStore((sp, key) => sp.GetRequiredService<CosmosAgentSessionStore>());
+}).WithCosmosSessionStore();
 
 var app = builder.Build();
 
@@ -116,7 +131,7 @@ app.MapA2A("advisor-agent", "/agenta2a", new AgentCard
         PushNotifications = false
     },
     Skills = [
-        new AgentSkill
+        new A2A.AgentSkill
         {
             Name = "Ski Resort Advisory",
             Description = "Coordinate weather, lift traffic, safety, and coaching information to provide personalized ski resort recommendations",

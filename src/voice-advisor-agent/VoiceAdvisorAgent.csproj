@@ -3,20 +3,29 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>VoiceAdvisorAgent</RootNamespace>
     <AzureCosmosDisableNewtonsoftJsonCheck>true</AzureCosmosDisableNewtonsoftJsonCheck>
   </PropertyGroup>
+
   <ItemGroup>
+    <PackageReference Include="Azure.AI.VoiceLive" Version="1.0.0" />
+    <PackageReference Include="Azure.Identity" Version="1.18.0" />
+    <PackageReference Include="Aspire.Microsoft.Azure.Cosmos" Version="13.2.1" />
+    <PackageReference Include="Microsoft.Azure.Cosmos" Version="3.58.0-preview.0" />
+
+    <!-- Microsoft Agent Framework (MAF) for A2A agent invocation -->
     <PackageReference Include="Microsoft.Agents.AI" Version="1.0.0" />
     <PackageReference Include="Microsoft.Agents.AI.A2A" Version="1.0.0-preview.260402.1" />
-    <PackageReference Include="Microsoft.Agents.AI.Abstractions" Version="1.0.0" />
     <PackageReference Include="Microsoft.Agents.AI.Hosting" Version="1.0.0-preview.260402.1" />
     <PackageReference Include="Microsoft.Agents.AI.Hosting.A2A.AspNetCore" Version="1.0.0-preview.260402.1" />
-    <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.0.0" />
-    <PackageReference Include="Aspire.Azure.AI.Inference" Version="13.2.1-preview.1.26180.6" />
-    <PackageReference Include="Aspire.Microsoft.Azure.Cosmos" Version="13.2.1" />
   </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\service-defaults\service-defaults.csproj" />
     <ProjectReference Include="..\shared-services\SharedServices.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Prompts\*.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

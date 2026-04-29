@@ -6,6 +6,7 @@
 
 #:project ./advisor-agent-dotnet/AdvisorAgent.Dotnet.csproj
 #:project ./lift-traffic-agent-dotnet/LiftTrafficAgent.Dotnet.csproj
+#:project ./voice-advisor-agent/VoiceAdvisorAgent.csproj
 
 using Aspire.Hosting.Foundry;
 
@@ -13,10 +14,12 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 var tenantId = builder.AddParameterFromConfiguration("tenant", "Azure:TenantId");
 
-var foundry = builder.AddFoundry("aif-ski-resort-demo");
-var project = foundry.AddProject("proj-ski-resort-demo");
+var foundry = builder.AddFoundry("aif-voice-ski-resort-demo");
+var project = foundry.AddProject("proj-voice-ski-resort-demo");
 var deployment = project.AddModelDeployment("gpt41", FoundryModel.OpenAI.Gpt41)
     .WithProperties(configure => configure.SkuCapacity = 150);
+var voiceDeployment = project.AddModelDeployment("gptrealtime", FoundryModel.OpenAI.GptRealtime)
+    .WithProperties(configure => configure.SkuCapacity = 10);    
 
 #pragma warning disable ASPIRECOSMOSDB001
 var cosmos = builder.AddAzureCosmosDB("cosmos-db")
@@ -28,6 +31,7 @@ var cosmos = builder.AddAzureCosmosDB("cosmos-db")
         });
 var db = cosmos.AddCosmosDatabase("db");
 var conversations = db.AddContainer("conversations", "/conversationId");
+var sessions = db.AddContainer("sessions", "/conversationId");
 
 // ---------------------------------------------------------------------------
 // Data Generator (Python)
@@ -79,6 +83,18 @@ var liftAgent = builder.AddProject<Projects.LiftTrafficAgent_Dotnet>("lift-traff
 var advisorAgent = builder.AddProject<Projects.AdvisorAgent_Dotnet>("advisor-agent-dotnet")
     .WithReference(deployment).WaitFor(deployment)
     .WithReference(conversations).WaitFor(conversations)
+    .WithReference(sessions).WaitFor(sessions)
+    .WithReference(weatherAgent).WaitFor(weatherAgent)
+    .WithReference(liftAgent).WaitFor(liftAgent)
+    .WithReference(safetyAgent).WaitFor(safetyAgent)
+    .WithReference(coachAgent).WaitFor(coachAgent);
+
+// ---------------------------------------------------------------------------
+// Voice Advisor Agent (.NET) — Voice orchestrator via WebSocket + Voice Live
+// ---------------------------------------------------------------------------
+var voiceAdvisorAgent = builder.AddProject<Projects.VoiceAdvisorAgent>("voice-advisor-agent")
+    .WithReference(voiceDeployment).WaitFor(voiceDeployment)
+    .WithReference(conversations).WaitFor(conversations)
     .WithReference(weatherAgent).WaitFor(weatherAgent)
     .WithReference(liftAgent).WaitFor(liftAgent)
     .WithReference(safetyAgent).WaitFor(safetyAgent)
@@ -89,6 +105,7 @@ var advisorAgent = builder.AddProject<Projects.AdvisorAgent_Dotnet>("advisor-age
 // ---------------------------------------------------------------------------
 builder.AddViteApp("frontend", "./frontend", "dev")
     .WithReference(advisorAgent).WaitFor(advisorAgent)
+    .WithReference(voiceAdvisorAgent).WaitFor(voiceAdvisorAgent)
     .WithReference(dataGenerator).WaitFor(dataGenerator)
     .WithUrls((e) =>
     {
