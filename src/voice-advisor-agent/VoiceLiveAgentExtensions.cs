@@ -27,9 +27,15 @@ public static partial class VoiceLiveAgentExtensions
     /// Converts an A2A <see cref="AIAgent"/> into a <see cref="VoiceLiveFunctionDefinition"/>
     /// that can be registered as a tool on a Voice Live session.
     /// </summary>
-    public static VoiceLiveFunctionDefinition AsVoiceLiveTool(this AIAgent agent)
+    public static VoiceLiveFunctionDefinition AsVoiceLiveTool(this AIAgent agent, string fallbackName)
     {
-        return new VoiceLiveFunctionDefinition(SanitizeAgentName(agent.Name))
+        var toolName = SanitizeAgentName(agent.Name) ?? SanitizeAgentName(fallbackName);
+        if (string.IsNullOrWhiteSpace(toolName))
+        {
+            throw new InvalidOperationException("Voice Live tool name cannot be empty.");
+        }
+
+        return new VoiceLiveFunctionDefinition(toolName)
         {
             Description = agent.Description ?? $"Invoke the {agent.Name} agent",
             Parameters = s_queryParameters

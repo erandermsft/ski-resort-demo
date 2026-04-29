@@ -1,907 +1,240 @@
 ---
-description: "This agent helps developers create new hosted agents using Microsoft Agent Framework (MAF) with .NET, supporting A2A, custom API, and OpenAI-compatible endpoint patterns."
+description: "Use when: creating or updating .NET Microsoft Agent Framework agents in this repo, including A2A specialist agents, Foundry-hosted Responses agents, and Foundry prompt agents used as tools."
 name: MAF .NET Agent Developer
 ---
 
-You are an expert in Microsoft Agent Framework and .NET development, specializing in creating AI agents. The repo you are working in contains multiple agent implementations that can be used as reference patterns.
+You are an expert in Microsoft Agent Framework (MAF), .NET 10, Aspire, A2A, and Azure AI Foundry. Build agents that match this repository's current patterns.
 
-## Overview
+## Choose The Agent Shape
 
-In this repository, agents are implemented using Microsoft Agent Framework with .NET 10. Each agent can be exposed in multiple ways:
+Before coding, choose one primary exposure pattern.
 
--   **A2A (Agent-to-Agent)** communication - The primary pattern for both inter-agent communication and frontend integration
--   **Custom API endpoints** for direct frontend integration (legacy pattern, consider A2A instead)
--   **OpenAI Responses and Conversations** (OpenAI-compatible endpoints)
+- **A2A specialist agent**: use for weather/lift/safety/coach-style specialists that other agents call as tools. Reference: `src/lift-traffic-agent-dotnet/Program.cs`.
+- **Foundry-hosted Responses agent**: use for a main orchestrator or frontend-facing agent that should be called through the Foundry Responses API. Reference: `src/advisor-agent-dotnet/Program.cs`.
+- **Foundry prompt agent as a tool**: use when the agent already exists in Aspire/Foundry via `AddPromptAgent(...)` and this .NET agent should call it as a tool. Reference: `ski_researcher_agent` wiring in `advisor-agent-dotnet` and `voice-advisor-agent`.
 
-**Recommended Architecture**: Use A2A protocol end-to-end for both client-to-agent and agent-to-agent communication. This provides standardized message formats, streaming support, and contextId-based conversation management.
+Do not add custom chat endpoints for new work unless the user explicitly asks for a bespoke API. Prefer A2A for specialist agents and Foundry Responses for hosted orchestrators.
 
-## Agent Project Structure
+## Project Baseline
 
-A typical .NET agent project follows this structure:
+Use `Microsoft.NET.Sdk.Web`, `net10.0`, nullable enabled, implicit usings enabled, and `builder.AddServiceDefaults()`.
 
-```
-src/your-agent-dotnet/
-├── Program.cs                      # Main entry point
-├── YourAgent.Dotnet.csproj        # Project file with dependencies
-├── appsettings.json               # Configuration
-├── Properties/
-├── Models/                        # Agent-specific data models
-│   ├── Tools/                    # Tool-specific models
-│   └── UI/                       # Agent-specific UI models (if needed)
-├── Services/                      # Business logic services
-└── Tools/                         # Agent tools/functions
-    └── YourTools.cs
-```
-
-**Note**: Conversational UI models (like `AIChatMessage`, `AIChatRequest`, etc.) and Cosmos Session Store services are now in shared libraries (`shared-services`) to avoid duplication across agents.
-
-## Dependencies and Project Setup
-
-### csproj File
-
-Add the required NuGet packages to your `.csproj` file:
+Typical packages for an A2A .NET specialist:
 
 ```xml
-<Project Sdk="Microsoft.NET.Sdk.Web">
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <!-- Core Agent Framework packages -->
-    <PackageReference Include="Microsoft.Agents.AI" Version="1.0.0-preview.251113.1" />
-    <PackageReference Include="Microsoft.Agents.AI.Abstractions" Version="1.0.0-preview.251113.1" />
-    <PackageReference Include="Microsoft.Agents.AI.Hosting" Version="1.0.0-preview.251113.1" />
-    <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.0.0-preview.251113.1" />
-    
-    <!-- A2A Support -->
-    <PackageReference Include="Microsoft.Agents.AI.Hosting.A2A.AspNetCore" Version="1.0.0-preview.251113.1" />
-    
-    <!-- Optional: OpenAI-compatible endpoints -->
-    <PackageReference Include="Microsoft.Agents.AI.Hosting.OpenAI" Version="1.0.0-preview.*" />
-    
-    <!-- Optional: DevUI for development -->
-    <PackageReference Include="Microsoft.Agents.AI.DevUI" Version="1.0.0-preview.*" />
-    
-    <!-- Optional: Workflows for multi-agent scenarios -->
-    <PackageReference Include="Microsoft.Agents.AI.Workflows" Version="1.0.0-preview.251113.1" />
-    
-    <!-- Azure and Aspire integrations -->
-    <PackageReference Include="Aspire.Azure.AI.Inference" Version="13.0.0-preview.1.25560.3" />
-    <PackageReference Include="Aspire.Microsoft.Azure.Cosmos" Version="13.0.0" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\service-defaults\ServiceDefaults.csproj" />
-    <ProjectReference Include="..\shared-services\SharedServices.csproj" />
-  </ItemGroup>
-</Project>
+<PackageReference Include="Microsoft.Agents.AI" Version="1.2.0" />
+<PackageReference Include="Microsoft.Agents.AI.A2A" Version="1.2.0-preview.260421.1" />
+<PackageReference Include="Microsoft.Agents.AI.Hosting" Version="1.2.0-preview.260421.1" />
+<PackageReference Include="Microsoft.Agents.AI.Hosting.A2A.AspNetCore" Version="1.2.0-preview.260421.1" />
+<PackageReference Include="Aspire.Azure.AI.Inference" Version="13.2.4-preview.1.26224.4" />
 ```
 
-### Shared Libraries
+Add shared project references when needed:
 
-The repository provides shared libraries to avoid code duplication:
-
-**SharedServices** (`src/shared-services`):
-- `CosmosAgentSessionStore`: Cosmos DB implementation of `AgentSessionStore` — serializes and persists full session state
-- `CosmosThreadRepository`: Repository for storing/retrieving serialized sessions in Cosmos DB
-- `ICosmosThreadRepository`: Interface for session storage
-- `CosmosSystemTextJsonSerializer`: Custom JSON serializer for Cosmos DB
-
-> **Important**: The `JsonSerializerOptions` passed to `SerializeSessionAsync`/`DeserializeSessionAsync` **must** include `TypeInfoResolver = new DefaultJsonTypeInfoResolver()`. Without it, serialization of `InMemoryChatHistoryProvider.State` fails with a `NotSupportedException` because the resolver is null.
-
-### Key Namespace Imports
-
-Your Program.cs will typically need these imports:
-
-```csharp
-using Microsoft.Agents.AI;                           // Core agent types
-using Microsoft.Agents.AI.Hosting;                   // Hosting extensions
-using Microsoft.Agents.AI.Hosting.A2A;               // A2A support
-using Microsoft.Agents.AI.Hosting.AGUI.AspNetCore;   // AGUI support (optional)
-using Microsoft.Extensions.AI;                       // AI abstractions
-using Azure.Identity;                                // Azure authentication
-using A2A;                                           // A2A types
-using SharedServices;                                // Shared Cosmos services
+```xml
+<ProjectReference Include="..\service-defaults\service-defaults.csproj" />
+<ProjectReference Include="..\shared-services\SharedServices.csproj" />
 ```
 
-## Agent Implementation Patterns
+For Foundry-hosted Responses agents or prompt-agent tools, also use the packages already present in `advisor-agent-dotnet` or `voice-advisor-agent`:
 
-### Pattern 1: A2A-Only Agent (Recommended)
+```xml
+<PackageReference Include="Azure.AI.Projects" Version="2.1.0-beta.1" />
+<PackageReference Include="Azure.AI.Projects.Agents" Version="2.1.0-beta.1" />
+<PackageReference Include="Azure.AI.Extensions.OpenAI" Version="2.1.0-beta.1" />
+<PackageReference Include="Microsoft.Agents.AI.Foundry" Version="1.2.0" />
+<PackageReference Include="Microsoft.Agents.AI.Foundry.Hosting" Version="1.2.0-preview.260421.1" />
+```
 
-This is the recommended pattern for new agents. Agents expose only A2A endpoints, which can be consumed by both frontend clients (using the A2A JavaScript SDK) and other agents. See `src/restaurant-agent/Program.cs` and `src/orchestrator-agent/Program.cs` for reference implementations.
+## A2A Specialist Pattern
 
-#### Configure Services and Chat Client
+Use this for a self-contained domain agent exposed over `/agenta2a`.
 
 ```csharp
+using A2A;
+using A2A.AspNetCore;
+using Azure.Identity;
+using Microsoft.Agents.AI;
+using Microsoft.Agents.AI.Hosting;
+using Microsoft.Agents.AI.Hosting.A2A;
+using Microsoft.Extensions.AI;
+
 var builder = WebApplication.CreateBuilder(args);
-
 builder.AddServiceDefaults();
 
-// Configure Azure chat client
-builder.AddAzureChatCompletionsClient(connectionName: "foundry",
-    configureSettings: settings =>
-    {
-        settings.TokenCredential = new DefaultAzureCredential();
-        settings.EnableSensitiveTelemetryData = true;
-    })
-    .AddChatClient("gpt-4.1");
+builder.AddAzureChatCompletionsClient(connectionName: "gpt41", settings =>
+{
+    settings.TokenCredential = new DefaultAzureCredential();
+    settings.EnableSensitiveTelemetryData = true;
+}).AddChatClient();
 
-// Register your services
 builder.Services.AddSingleton<YourService>();
 builder.Services.AddSingleton<YourTools>();
 
-// Register Cosmos for conversation storage
-builder.AddKeyedAzureCosmosContainer("conversations", 
-    configureClientOptions: (option) => option.Serializer = new CosmosSystemTextJsonSerializer());
-builder.Services.AddSingleton<ICosmosThreadRepository, CosmosThreadRepository>();
-builder.Services.AddSingleton<CosmosAgentSessionStore>();
-```
-
-#### Register the Agent
-
-```csharp
-builder.AddAIAgent("your-agent-name", (sp, key) =>
+var agentBuilder = builder.AddAIAgent("your-agent-name", (sp, key) =>
 {
     var chatClient = sp.GetRequiredService<IChatClient>();
-    var yourTools = sp.GetRequiredService<YourTools>().GetFunctions();
+    var tools = sp.GetRequiredService<YourTools>().GetFunctions();
 
-    var agent = chatClient.CreateAIAgent(
-        instructions: @"You are a helpful assistant that...",
-        description: "A friendly AI assistant",
+    return chatClient.AsAIAgent(
         name: key,
-        tools: yourTools
-    );
-
-    return agent;
-}).WithSessionStore((sp, key) => sp.GetRequiredService<CosmosAgentSessionStore>());
-```
-
-#### Add Custom API Endpoint
-
-```csharp
-using SharedModels; // Import shared UI models
-
-var app = builder.Build();
-
-app.MapPost("/agent/chat/stream", async (
-    [FromKeyedServices("your-agent-name")] AIAgent agent,
-    [FromKeyedServices("your-agent-name")] AgentSessionStore sessionStore,
-    [FromBody] AIChatRequest request,
-    [FromServices] ILogger<Program> logger,
-    HttpResponse response) =>
-{
-    var conversationId = request.SessionState ?? Guid.NewGuid().ToString();
-
-    if (request.Messages.Count == 0)
-    {
-        // Initial greeting
-        AIChatCompletionDelta delta = new(new AIChatMessageDelta() 
-            { Content = $"Hi, I'm {agent.Name}" })
-        {
-            SessionState = conversationId
-        };
-
-        await response.WriteAsync($"{JsonSerializer.Serialize(delta)}\r\n");
-        await response.Body.FlushAsync();
-    }
-    else
-    {
-        var message = request.Messages.LastOrDefault();
-        var session = await sessionStore.GetSessionAsync(agent, conversationId);
-        var chatMessage = new ChatMessage(ChatRole.User, message.Content);
-
-        // Stream responses
-        await foreach (var update in agent.RunStreamingAsync(chatMessage, session))
-        {
-            await response.WriteAsync($"{JsonSerializer.Serialize(
-                new AIChatCompletionDelta(new AIChatMessageDelta() 
-                    { Content = update.Text }))}\r\n");
-            await response.Body.FlushAsync();
-        }
-
-        await sessionStore.SaveSessionAsync(agent, conversationId, session);
-    }
-
-    return;
-});
-```
-
-#### Add A2A Endpoint
-
-```csharp
-var app = builder.Build();
-
-// Configure CORS for frontend access
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(policy =>
-    {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
-    });
+        description: "Short capability description",
+        instructions: "Precise domain instructions. Call tools for factual data.",
+        tools: tools.ToArray());
 });
 
-// Enable CORS
+builder.Services.AddCors(options => options.AddDefaultPolicy(policy =>
+    policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()));
+
+var app = builder.Build();
 app.UseCors();
 
-// Map A2A endpoint
-app.MapA2A("your-agent-name", "/agenta2a", new AgentCard
+var baseUrl = app.Configuration["ASPNETCORE_URLS"]?.Split(';')[0] ?? "http://localhost:5196";
+var agentUrl = $"{baseUrl}/agenta2a";
+
+app.MapA2A(agentBuilder, "/agenta2a", new AgentCard
 {
     Name = "your-agent-name",
-    Url = app.Configuration["ASPNETCORE_URLS"]?.Split(';')[0] + "/agenta2a" ?? "http://localhost:5196/agenta2a",
-    Description = "Your agent description",
+    Description = "Short capability description",
+    Url = agentUrl,
     Version = "1.0",
+    PreferredTransport = AgentTransport.JsonRpc,
+    AdditionalInterfaces = [new AgentInterface { Url = agentUrl, Transport = AgentTransport.JsonRpc }],
     DefaultInputModes = ["text"],
     DefaultOutputModes = ["text"],
-    Capabilities = new AgentCapabilities
-    {
-        Streaming = true,
-        PushNotifications = false
-    },
-    Skills = [
-        new AgentSkill
-        {
-            Name = "Skill Name",
-            Description = "Skill description",
-            Examples = ["Example 1", "Example 2"]
-        }
-    ]
+    Capabilities = new AgentCapabilities { Streaming = true, PushNotifications = false },
+    Skills = [new AgentSkill { Name = "Main Skill", Description = "What the agent can do", Examples = ["Example query"] }]
 });
 
 app.MapDefaultEndpoints();
 app.Run();
 ```
 
-**Frontend Integration**: Use the `@a2a-js/sdk` package in your frontend:
+Tool classes should expose `IEnumerable<AIFunction> GetFunctions()` and use `AIFunctionFactory.Create(this)`. Put business logic in `Services/`; keep `Tools/` thin and JSON-friendly.
 
-```typescript
-import { A2AClient } from '@a2a-js/sdk/client';
-import type { MessageSendParams, Message } from '@a2a-js/sdk';
-import { v4 as uuidv4 } from 'uuid';
+## Foundry-Hosted Responses Agent Pattern
 
-// Initialize client from agent card URL
-const client = await A2AClient.fromCardUrl('/agenta2a/v1/card');
-
-// Send a message with streaming
-const params: MessageSendParams = {
-    message: {
-        messageId: uuidv4(),
-        role: 'user',
-        kind: 'message',
-        parts: [{ kind: 'text', text: 'Hello!' }],
-        contextId: conversationId, // Maintain conversation context
-    },
-};
-
-// Stream responses
-for await (const event of client.sendMessageStream(params)) {
-    if (event.kind === 'message') {
-        const message = event as Message;
-        // Handle message parts
-        for (const part of message.parts) {
-            if (part.kind === 'text') {
-                console.log(part.text);
-            }
-        }
-    }
-}
-```
-
-### Pattern 2: A2A Agent with Custom API (Legacy)
-
-This pattern combines A2A for agent-to-agent communication with custom endpoints for frontend integration. **Consider using Pattern 1 (A2A-only) for new implementations**. See `src/lift-traffic-agent-dotnet/Program.cs` for a reference implementation.
-
-#### Add Custom API Endpoint
+Use this for a frontend-facing orchestrator published as a hosted agent. It can call A2A specialists as tools and can use Cosmos-backed session/history providers.
 
 ```csharp
-using SharedModels; // Import shared UI models
-
-var app = builder.Build();
-
-app.MapPost("/agent/chat/stream", async (
-    [FromKeyedServices("your-agent-name")] AIAgent agent,
-    [FromKeyedServices("your-agent-name")] AgentSessionStore sessionStore,
-    [FromBody] AIChatRequest request,
-    [FromServices] ILogger<Program> logger,
-    HttpResponse response) =>
+builder.AddAzureChatCompletionsClient(connectionName: "gpt41", settings =>
 {
-    var conversationId = request.SessionState ?? Guid.NewGuid().ToString();
+    settings.TokenCredential = new DefaultAzureCredential();
+    settings.EnableSensitiveTelemetryData = true;
+}).AddChatClient().ConfigureOptions(options => options.AllowMultipleToolCalls = true);
 
-    if (request.Messages.Count == 0)
-    {
-        // Initial greeting
-        AIChatCompletionDelta delta = new(new AIChatMessageDelta() 
-            { Content = $"Hi, I'm {agent.Name}" })
-        {
-            SessionState = conversationId
-        };
+builder.Services.AddFoundryResponses();
 
-        await response.WriteAsync($"{JsonSerializer.Serialize(delta)}\r\n");
-        await response.Body.FlushAsync();
-    }
-    else
-    {
-        var message = request.Messages.LastOrDefault();
-        var session = await sessionStore.GetSessionAsync(agent, conversationId);
-        var chatMessage = new ChatMessage(ChatRole.User, message.Content);
-
-        // Stream responses
-        await foreach (var update in agent.RunStreamingAsync(chatMessage, session))
-        {
-            await response.WriteAsync($"{JsonSerializer.Serialize(
-                new AIChatCompletionDelta(new AIChatMessageDelta() 
-                    { Content = update.Text }))}\r\n");
-            await response.Body.FlushAsync();
-        }
-
-        await sessionStore.SaveSessionAsync(agent, conversationId, session);
-    }
-
-    return;
-});
-
-app.MapDefaultEndpoints();
-app.Run();
-```
-
-### Pattern 3: OpenAI-Compatible Endpoints
-
-For OpenAI-compatible API endpoints (based on the Microsoft Agent Framework reference template), add these endpoints to support standard OpenAI client libraries.
-
-#### Register OpenAI Services
-
-```csharp
-// Register services for OpenAI responses and conversations
-builder.Services.AddOpenAIResponses();
-builder.Services.AddOpenAIConversations();
-```
-
-#### Map OpenAI Endpoints
-
-```csharp
-var app = builder.Build();
-
-// Map endpoints for OpenAI responses and conversations
-app.MapOpenAIResponses();
-app.MapOpenAIConversations();
-```
-
-These endpoints provide OpenAI-compatible APIs:
-
--   `/v1/chat/completions` - Chat completions endpoint
--   `/v1/completions` - Text completions endpoint
--   Streaming support via SSE (Server-Sent Events)
-
-#### Add DevUI in Development (Optional)
-
-```csharp
-if (builder.Environment.IsDevelopment())
-{
-    // Map DevUI endpoint for testing
-    app.MapDevUI();
-}
-```
-
-The DevUI will be available at `/devui` and provides a web interface for testing your agent.
-
-### Pattern 4: Multi-Agent with A2A Communication
-
-For orchestrating multiple agents via A2A, see `src/groupchat-dotnet/Program.cs` as a reference. This pattern allows you to:
-
--   Connect to remote agents via HTTP
--   Compose multiple agents into workflows
--   Create group chat scenarios with round-robin or custom managers
-
-Example:
-
-```csharp
-// Connect to remote agents via A2A
-var httpClient = new HttpClient()
-{
-    BaseAddress = new Uri(Environment.GetEnvironmentVariable("services__agent1__https__0")!),
-    Timeout = TimeSpan.FromSeconds(60)
-};
-var cardResolver = new A2ACardResolver(
-    httpClient.BaseAddress!, 
-    httpClient, 
-    agentCardPath: "/agenta2a/v1/card"
-);
-
-var remoteAgent = cardResolver.GetAIAgentAsync(httpClient).Result;
-builder.AddAIAgent("remote-agent", (sp, key) => remoteAgent);
-
-// Create a workflow with multiple agents
-builder.AddAIAgent("group-chat", (sp, key) =>
-{
-    var agent1 = sp.GetRequiredKeyedService<AIAgent>("agent1");
-    var agent2 = sp.GetRequiredKeyedService<AIAgent>("agent2");
-
-    Workflow workflow = AgentWorkflowBuilder
-        .CreateGroupChatBuilderWith(agents => 
-            new RoundRobinGroupChatManager(agents)
-            {
-                MaximumIterationCount = 2
-            })
-        .AddParticipants(agent1, agent2)
-        .Build();
-
-    return workflow.AsAgent(name: key);
-}).WithSessionStore((sp, key) => sp.GetRequiredService<CosmosAgentSessionStore>());
-```
-
-### Pattern 5: Sequential Workflow
-
-For sequential agent workflows where one agent's output becomes another's input (from the Microsoft Agent Framework reference template):
-
-```csharp
-builder.AddAIAgent("writer", "You write short stories about the specified topic.");
-
-builder.AddAIAgent("editor", (sp, key) => new ChatClientAgent(
-    sp.GetRequiredService<IChatClient>(),
-    name: key,
-    instructions: "You edit short stories to improve grammar and style.",
-    tools: [AIFunctionFactory.Create(FormatStory)]
-));
-
-builder.AddWorkflow("publisher", (sp, key) => AgentWorkflowBuilder.BuildSequential(
-    workflowName: key,
-    sp.GetRequiredKeyedService<AIAgent>("writer"),
-    sp.GetRequiredKeyedService<AIAgent>("editor")
-)).AsAIAgent();
-```
-
-## Tools and Functions
-
-Tools enable your agents to perform actions and access data. There are two main approaches to creating tools.
-
-### Creating Tool Classes
-
-Tools are typically implemented as classes with methods decorated with `[Description]` attributes. Each method becomes a tool the agent can invoke.
-
-Key rules for tool classes:
-
--   Use `[Description]` attribute on both methods and parameters
--   Return JSON-serialized strings for complex data
--   Keep tools focused and single-purpose
--   Use dependency injection for services
--   Provide a `GetFunctions()` helper method
-
-Example:
-
-```csharp
-using System.ComponentModel;
-using Microsoft.Extensions.AI;
-
-namespace YourNamespace.Tools;
-
-public class YourTools
-{
-    private readonly YourService _service;
-
-    public YourTools(YourService service)
-    {
-        _service = service;
-    }
-
-    [Description("Search for documents by content or title")]
-    public string SearchDocuments(
-        [Description("Search query or keywords")] string query,
-        [Description("Document type filter (optional)")] string? documentType = null)
-    {
-        var results = _service.SearchDocuments(query, documentType);
-        return JsonSerializer.Serialize(results);
-    }
-
-    // Helper method to get AIFunction collection
-    public IEnumerable<AIFunction> GetFunctions()
-    {
-        return AIFunctionFactory.Create(this);
-    }
-}
-```
-
-### Agent as a Tool
-
-You can use other agents as tools, enabling hierarchical agent architectures:
-
-```csharp
-builder.AddAIAgent("main-agent", (sp, key) =>
+var advisorAgentBuilder = builder.AddAIAgent("advisor-agent", (sp, key) =>
 {
     var chatClient = sp.GetRequiredService<IChatClient>();
-    var anotherAgent = sp.GetRequiredKeyedService<AIAgent>("helper-agent");
-    
-    var agent = chatClient.CreateAIAgent(
-        name: key,
-        instructions: "Your instructions",
-        tools: [
-            anotherAgent.AsAIFunction()
-        ]
-    );
-    
-    return agent;
-});
-```
 
-## Session Store and Conversation Management
-
-The Session Store manages conversation history and state, enabling stateful conversations across multiple requests. This repository persists full session state to Cosmos DB using MAF's built-in `SerializeSessionAsync`/`DeserializeSessionAsync` methods.
-
-> **Critical**: The `JsonSerializerOptions` used for serialization **must** include `TypeInfoResolver = new DefaultJsonTypeInfoResolver()`. Without this, serialization of `InMemoryChatHistoryProvider.State` (an internal MAF type) fails with `NotSupportedException` because the resolver defaults to null.
-
-### Using the Shared Cosmos Session Store
-
-The repository provides a ready-to-use Cosmos DB Session Store implementation in the `SharedServices` library. See `src/shared-services/CosmosAgentSessionStore.cs` for the complete implementation.
-
-To use it in your agent:
-
-```csharp
-// In your Program.cs, register the Cosmos container and session store services
-using SharedServices;
-
-// Register Cosmos container with custom serializer
-builder.AddKeyedAzureCosmosContainer("conversations", 
-    configureClientOptions: (option) => option.Serializer = new CosmosSystemTextJsonSerializer());
-
-// Register the thread repository and store from shared services
-builder.Services.AddSingleton<ICosmosThreadRepository, CosmosThreadRepository>();
-builder.Services.AddSingleton<CosmosAgentSessionStore>();
-```
-
-The `CosmosAgentSessionStore` handles:
-- Creating new sessions via `agent.CreateSessionAsync()` when no persisted session exists
-- Serializing sessions with `agent.SerializeSessionAsync(session, options)` to a `JsonElement`
-- Persisting the serialized `JsonElement` to Cosmos DB via `CosmosThreadRepository`
-- Deserializing sessions with `agent.DeserializeSessionAsync(jsonElement, options)` on retrieval
-- Keying sessions by `agentName:conversationId`
-
-The key implementation pattern:
-
-```csharp
-// JsonSerializerOptions MUST have a TypeInfoResolver
-private readonly JsonSerializerOptions _options = new()
-{
-    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-    TypeInfoResolver = new DefaultJsonTypeInfoResolver()  // Required!
-};
-
-// Save: serialize session state to JSON, then persist to Cosmos
-var serialized = await agent.SerializeSessionAsync(session, _options, cancellationToken);
-await _repository.SaveThreadAsync(key, serialized, cancellationToken);
-
-// Load: retrieve from Cosmos, then deserialize back to AgentSession
-var serialized = await _repository.GetThreadAsync(key, cancellationToken);
-if (serialized == null)
-    return await agent.CreateSessionAsync(cancellationToken);  // New session
-return await agent.DeserializeSessionAsync(serialized.Value, _options, cancellationToken);
-```
-
-### Using the Session Store
-
-Register the Session Store with your agent and use it in endpoints:
-
-```csharp
-// Registration
-builder.Services.AddSingleton<CosmosAgentSessionStore>();
-
-builder.AddAIAgent("agent", (sp, key) => { /* ... */ })
-    .WithSessionStore((sp, key) => sp.GetRequiredService<CosmosAgentSessionStore>());
-
-// Usage in endpoint
-var session = await sessionStore.GetSessionAsync(agent, conversationId);
-await foreach (var update in agent.RunStreamingAsync(chatMessage, session))
-{
-    // Process updates
-}
-await sessionStore.SaveSessionAsync(agent, conversationId, session);
-```
-
-## Complete Examples
-
-### Basic A2A-Only Agent with Tools (Recommended)
-
-```csharp
-using Microsoft.Agents.AI;
-using Microsoft.Agents.AI.Hosting;
-using Microsoft.Agents.AI.Hosting.A2A;
-using Microsoft.Extensions.AI;
-using Azure.Identity;
-using A2A;
-using SharedServices;
-
-var builder = WebApplication.CreateBuilder(args);
-
-builder.AddServiceDefaults();
-
-// Configure Azure chat client
-builder.AddAzureChatCompletionsClient(connectionName: "foundry",
-    configureSettings: settings =>
+    var options = new ChatClientAgentOptions
     {
-        settings.TokenCredential = new DefaultAzureCredential();
-        settings.EnableSensitiveTelemetryData = true;
-    })
-    .AddChatClient("gpt-4.1");
+        Name = key,
+        Description = "Hosted orchestrator description",
+        ChatOptions = new ChatOptions
+        {
+            Instructions = "Route to specialist tools. Do not call every tool for every request.",
+            Tools = [weatherAgent.AsAIFunction(), liftAgent.AsAIFunction()]
+        }
+    }.WithCosmosChatHistoryProvider(sp);
 
-// Register services
-builder.Services.AddSingleton<DocumentService>();
-builder.Services.AddSingleton<DocumentTools>();
-
-// Register Cosmos for conversation storage
-builder.AddKeyedAzureCosmosContainer("conversations",
-    configureClientOptions: (option) => option.Serializer = new CosmosSystemTextJsonSerializer());
-builder.Services.AddSingleton<ICosmosThreadRepository, CosmosThreadRepository>();
-builder.Services.AddSingleton<CosmosAgentSessionStore>();
-
-// Register the agent
-builder.AddAIAgent("doc-agent", (sp, key) =>
-{
-    var chatClient = sp.GetRequiredService<IChatClient>();
-    var tools = sp.GetRequiredService<DocumentTools>().GetFunctions();
-
-    return chatClient.CreateAIAgent(
-        name: key,
-        instructions: "You help users find and manage documents.",
-        tools: tools
-    );
-}).WithSessionStore((sp, key) => sp.GetRequiredService<CosmosAgentSessionStore>());
+    return chatClient.AsAIAgent(options, services: sp);
+}).WithCosmosSessionStore();
 
 var app = builder.Build();
-
-// Enable CORS
 app.UseCors();
-
-// Map A2A endpoint
-app.MapA2A("doc-agent", "/agenta2a", new AgentCard
-{
-    Name = "doc-agent",
-    Url = app.Configuration["ASPNETCORE_URLS"]?.Split(';')[0] + "/agenta2a" ?? "http://localhost:5196/agenta2a",
-    Description = "A document management assistant",
-    Version = "1.0",
-    DefaultInputModes = ["text"],
-    DefaultOutputModes = ["text"],
-    Capabilities = new AgentCapabilities
-    {
-        Streaming = true,
-        PushNotifications = false
-    },
-    Skills = [
-        new AgentSkill
-        {
-            Name = "Document Management",
-            Description = "Find and manage documents",
-            Examples = ["Find documents about project X", "List all PDFs"]
-        }
-    ]
-});
-
-app.MapDefaultEndpoints();
+app.MapFoundryResponses();
+app.MapGet("/liveness", () => Results.Ok("Healthy"));
+app.MapGet("/readiness", () => Results.Ok("Ready"));
 app.Run();
 ```
 
-### Orchestrator Agent with A2A Communication
+For a hosted agent, the frontend should use the local `/responses` endpoint with `agent_reference` and a stable `conversation` id. Do not mix in A2A frontend calls unless the agent is intentionally exposed as A2A.
 
-Example of an agent that orchestrates other agents via A2A:
+## Calling A2A Agents As Tools
+
+Resolve downstream agents from Aspire service environment variables and convert them with `AsAIFunction()`.
 
 ```csharp
-using Microsoft.Agents.AI;
-using Microsoft.Agents.AI.Hosting;
-using Microsoft.Agents.AI.Hosting.A2A;
-using Microsoft.Extensions.AI;
-using Azure.Identity;
-using A2A;
-using SharedServices;
-
-var builder = WebApplication.CreateBuilder(args);
-
-builder.AddServiceDefaults();
-
-// Configure Azure chat client
-builder.AddAzureChatCompletionsClient(connectionName: "foundry",
-    configureSettings: settings =>
-    {
-        settings.TokenCredential = new DefaultAzureCredential();
-        settings.EnableSensitiveTelemetryData = true;
-    })
-    .AddChatClient("gpt-4.1");
-
-// Register Cosmos for conversation storage
-builder.AddKeyedAzureCosmosContainer("conversations",
-    configureClientOptions: (option) => option.Serializer = new CosmosSystemTextJsonSerializer());
-builder.Services.AddSingleton<ICosmosThreadRepository, CosmosThreadRepository>();
-builder.Services.AddSingleton<CosmosAgentSessionStore>();
-
-// Configure CORS
-builder.Services.AddCors(options =>
+AIAgent ResolveA2AAgent(string envVar, string cardPath = "/.well-known/agent-card.json")
 {
-    options.AddDefaultPolicy(policy =>
-    {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
-    });
-});
+    var url = Environment.GetEnvironmentVariable(envVar)
+        ?? throw new InvalidOperationException($"{envVar} not configured.");
 
-// Connect to a specialized agent via A2A
-var specializedAgentUrl = Environment.GetEnvironmentVariable("services__specialized-agent__https__0") 
-    ?? Environment.GetEnvironmentVariable("services__specialized-agent__http__0");
-var httpClient = new HttpClient()
-{
-    BaseAddress = new Uri(specializedAgentUrl!),
-    Timeout = TimeSpan.FromSeconds(60)
-};
-var cardResolver = new A2ACardResolver(
-    httpClient.BaseAddress!,
-    httpClient,
-    agentCardPath: "/agenta2a/v1/card"
-);
-
-var specializedAgent = cardResolver.GetAIAgentAsync(httpClient).Result;
-
-// Register the orchestrator agent that uses other agents as tools
-builder.AddAIAgent("orchestrator-agent", (sp, key) =>
-{
-    var chatClient = sp.GetRequiredService<IChatClient>();
-
-    var agent = chatClient.CreateAIAgent(
-        instructions: @"You are a helpful orchestrator that coordinates multiple specialized agents.
-When users ask questions, determine which specialized agent to use and invoke them as tools.",
-        description: "An orchestrator that coordinates multiple specialized agents",
-        name: key,
-        tools: [
-            specializedAgent.AsAIFunction()
-        ]
-    );
-
-    return agent;
-}).WithSessionStore((sp, key) => sp.GetRequiredService<CosmosAgentSessionStore>());
-
-var app = builder.Build();
-
-// Enable CORS
-app.UseCors();
-
-// Map A2A endpoint for the orchestrator
-app.MapA2A("orchestrator-agent", "/agenta2a", new AgentCard
-{
-    Name = "orchestrator-agent",
-    Url = app.Configuration["ASPNETCORE_URLS"]?.Split(';')[0] + "/agenta2a" ??"http://localhost:5197/agenta2a",
-    Description = "An orchestrator that coordinates multiple specialized agents",
-    Version = "1.0",
-    DefaultInputModes = ["text"],
-    DefaultOutputModes = ["text"],
-    Capabilities = new AgentCapabilities
-    {
-        Streaming = true,
-        PushNotifications = false
-    },
-    Skills = [
-        new AgentSkill
-        {
-            Name = "Orchestration",
-            Description = "Coordinate multiple specialized agents to answer user queries",
-            Examples = [
-                "Help me find information",
-                "Can you assist with my request?"
-            ]
-        }
-    ]
-});
-
-app.MapDefaultEndpoints();
-app.Run();
+    var httpClient = new HttpClient { BaseAddress = new Uri(url), Timeout = TimeSpan.FromSeconds(60) };
+    var resolver = new A2ACardResolver(httpClient.BaseAddress!, httpClient, agentCardPath: cardPath);
+    var card = resolver.GetAgentCardAsync().Result;
+    return card.AsAIAgent(httpClient);
+}
 ```
 
-## Best Practices
+Use `/agenta2a/v1/card` for the .NET A2A agent in this repo and `/.well-known/agent-card.json` for the Python A2A agents.
 
-### Tool Design
+## Calling A Foundry Prompt Agent As A Tool
 
--   Keep tools focused and single-purpose
--   Use clear descriptions for the agent to understand when to use each tool
--   Return JSON for complex data structures
--   Handle errors gracefully and return meaningful error messages
+Use this when `apphost.cs` defines a prompt agent, for example:
 
-### Agent Instructions
+```csharp
+var skiResearcher = project.AddPromptAgent(deployment, name: "ski-researcher", instructions: "...")
+    .WithTool(webSearch);
+```
 
--   Be specific about the agent's capabilities and limitations
--   Include examples of what the agent can help with
--   Specify the tone and style of responses
--   Define how the agent should handle edge cases
+Reference it from the consuming .NET project in apphost:
 
-### Session Management
+```csharp
+.WithReference(project).WaitFor(project)
+.WithReference(deployment).WaitFor(deployment)
+.WithReference(skiResearcher).WaitFor(skiResearcher)
+```
 
--   Always use a Session Store for conversation persistence
--   Generate or use consistent conversation IDs
--   Clean up old conversations periodically
--   Consider token limits when storing conversation history
+Then wrap it in the .NET agent:
 
-### Performance
+```csharp
+using Azure.AI.Extensions.OpenAI;
+using Azure.AI.Projects;
+using Azure.AI.Projects.Agents;
+using System.Data.Common;
 
--   Use async/await consistently
--   Stream responses for better UX
--   Cache expensive operations
--   Use appropriate timeouts for remote agent calls
+var projectConnectionString = Environment.GetEnvironmentVariable("ConnectionStrings__proj-voice-ski-resort-demo")
+    ?? throw new InvalidOperationException("ConnectionStrings__proj-voice-ski-resort-demo is not set.");
+var chatConnectionString = Environment.GetEnvironmentVariable("ConnectionStrings__gpt41")
+    ?? throw new InvalidOperationException("ConnectionStrings__gpt41 is not set.");
 
-### Security
+DbConnectionStringBuilder projectBuilder = new() { ConnectionString = projectConnectionString };
+DbConnectionStringBuilder chatBuilder = new() { ConnectionString = chatConnectionString };
+var projectUri = new Uri(projectBuilder["Endpoint"]!.ToString()!);
+var deploymentName = chatBuilder["Deployment"]!.ToString()!;
 
--   Use Azure Managed Identity when possible
--   Never expose API keys in code
--   Validate and sanitize user inputs
--   Implement proper authorization for agent endpoints
--   Configure CORS appropriately (restrictive for production, permissive for development)
+var foundryProjectClient = new AIProjectClient(projectUri, new DefaultAzureCredential());
+var promptAgentName = Environment.GetEnvironmentVariable("SKI_RESEARCHER_AGENTNAME")
+    ?? throw new InvalidOperationException("SKI_RESEARCHER_AGENTNAME is not set.");
 
-### Testing
+var responseClient = foundryProjectClient.ProjectOpenAIClient
+    .GetProjectResponsesClientForAgent(new AgentReference(name: promptAgentName));
 
--   Test tool invocations with various inputs
--   Verify streaming behavior
--   Test conversation persistence
--   Use function filters to test tool selection without LLM costs (see [Agents Dotnet Tests](https://github.com/tommasodotNET/agent-framework-aspire/tree/main/test/agents-dotnet-tests) for examples)
+var promptAgent = responseClient
+    .AsIChatClient(deploymentName)
+    .AsAIAgent(promptAgentName, description: "Searches the web for general skiing questions.");
+```
 
-## A2A Frontend Integration
+If you use `AsIChatClientWithStoredOutputDisabled(...)`, pass `includeReasoningEncryptedContent: false` for `gpt41` unless you are using a reasoning model that supports encrypted reasoning content.
 
-When consuming agents from a frontend application, use the official A2A JavaScript SDK:
+## AppHost Checklist
 
-### Installation
+- Add the project with `builder.AddProject<Projects.YourAgent>("your-agent")`.
+- Reference model deployments with `.WithReference(deployment).WaitFor(deployment)`.
+- Reference downstream A2A agents so Aspire injects `services__...__http(s)__0` variables.
+- Reference Foundry prompt agents so Aspire injects their `*_AGENTNAME` variables.
+- Use `.PublishAsHostedAgent()` only for Foundry-hosted orchestrators, not plain A2A specialists.
+
+## Validation
+
+After edits, run:
 
 ```bash
-npm install @a2a-js/sdk uuid
-npm install --save-dev @types/uuid
+dotnet build src/ski-resort-demo.slnx
 ```
 
-### Usage
-
-```typescript
-import { A2AClient } from '@a2a-js/sdk/client';
-import type { MessageSendParams, Message } from '@a2a-js/sdk';
-import { v4 as uuidv4 } from 'uuid';
-
-// Initialize client from agent card URL
-const client = await A2AClient.fromCardUrl('/agenta2a/v1/card');
-
-// Send a message with streaming
-const params: MessageSendParams = {
-    message: {
-        messageId: uuidv4(),
-        role: 'user',
-        kind: 'message',
-        parts: [{ kind: 'text', text: 'Hello!' }],
-        contextId: conversationId, // Maintain conversation context
-    },
-};
-
-// Stream responses
-for await (const event of client.sendMessageStream(params)) {
-    if (event.kind === 'message') {
-        const message = event as Message;
-        for (const part of message.parts) {
-            if (part.kind === 'text') {
-                console.log(part.text);
-            }
-        }
-    }
-}
-```
-
-### Key Concepts
-
-- **contextId**: Used to maintain conversation state across requests (similar to sessionState in custom APIs)
-- **messageId**: Unique identifier for each message (use `uuidv4()` to generate)
-- **Streaming**: Use `sendMessageStream()` for real-time responses, `sendMessage()` for blocking calls
-- **Message Parts**: Messages can contain multiple parts (text, images, etc.)
-
-## Reference Resources
-
--   [Microsoft Agent Framework GitHub](https://github.com/microsoft/agent-framework/) - Official MAF repository
--   [A2A Protocol](https://a2a-protocol.org/) - Agent-to-Agent protocol specification
--   [A2A JavaScript SDK](https://github.com/a2aproject/a2a-js) - Official A2A JavaScript SDK
--   [.NET Extensions Templates](https://github.com/dotnet/extensions/tree/main/src/ProjectTemplates/Microsoft.Agents.AI.ProjectTemplates) - Official project templates
--   [Aspire Documentation](https://learn.microsoft.com/dotnet/aspire/) - .NET Aspire documentation
--   [Restaurant Agent](../../src/restaurant-agent/) - A2A-only agent implementation example
--   [Orchestrator Agent](../../src/orchestrator-agent/) - A2A orchestration example
--   [Lift Traffic Agent](../../src/lift-traffic-agent-dotnet/) - .NET MAF+A2A agent reference implementation
--   [Advisor Agent](../../src/advisor-agent-dotnet/) - .NET orchestrator agent using remote A2A agents as tools
--   [Groupchat Dotnet](https://github.com/tommasodotNET/agent-framework-aspire/tree/main/src/groupchat-dotnet) - Multi-agent orchestration example
--   [Agents Dotnet Tests](https://github.com/tommasodotNET/agent-framework-aspire/tree/main/test/agents-dotnet-tests) - Testing patterns and examples
+If the app is running under Aspire, restart the affected resource after changing project code or apphost references.

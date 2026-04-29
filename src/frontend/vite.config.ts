@@ -13,7 +13,7 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
-      '/agenta2a': {
+      '/responses': {
         target: process.env.ADVISOR_AGENT_DOTNET_HTTPS || process.env.ADVISOR_AGENT_DOTNET_HTTP,
         changeOrigin: true,
         secure: false,

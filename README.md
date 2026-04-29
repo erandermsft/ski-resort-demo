@@ -1,8 +1,8 @@
 # 🏔️ AlpineAI – Multi-Agent Ski Resort Demo
 
-A distributed, multi-agent ski resort system built with **Microsoft Agent Framework (MAF)**, the **A2A protocol**, and **Aspire**.
+A distributed, multi-agent ski resort system built with **Microsoft Agent Framework (MAF)**, **Azure AI Foundry**, the **A2A protocol**, **Voice Live**, and **Aspire**.
 
-An AI-powered ski resort concierge that coordinates weather intelligence, lift traffic, safety evaluation, and personalized coaching through a network of specialist agents — all orchestrated by a central advisor and displayed on a real-time dashboard.
+An AI-powered ski resort concierge that coordinates weather intelligence, lift traffic, safety evaluation, personalized coaching, web-backed ski research, and voice conversations through a network of specialist agents — all orchestrated by hosted advisor experiences and displayed on a real-time dashboard.
 
 ![.NET](https://img.shields.io/badge/.NET_10-512BD4?style=flat&logo=dotnet&logoColor=white)
 ![Python](https://img.shields.io/badge/Python_3.11+-3776AB?style=flat&logo=python&logoColor=white)
@@ -12,35 +12,40 @@ An AI-powered ski resort concierge that coordinates weather intelligence, lift t
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                   Frontend (Vite + React)            │
-│         Real-time dashboard + AI Chat (A2A)         │
-└──────────────┬──────────────────────┬───────────────┘
-               │ REST                 │ A2A (streaming)
+┌──────────────────────────────────────────────────────────────────────┐
+│                         Frontend (Vite + React)                       │
+│          Dashboard data + chat via Responses + voice via WS           │
+└──────────────┬──────────────────────┬────────────────────────────────┘
+               │ REST                 │ Responses API / WebSocket
                ▼                      ▼
-┌──────────────────────┐  ┌──────────────────────────┐
-│   Data Generator     │  │   Advisor Agent (.NET)   │
-│   (Python/FastAPI)   │  │   Orchestrator via A2A   │
-└──────────────────────┘  └────┬───┬───┬───┬─────────┘
-                               │   │   │   │  A2A
-                    ┌──────────┘   │   │   └──────────┐
-                    ▼              ▼   ▼              ▼
-             ┌───────────┐ ┌──────────┐ ┌───────────┐ ┌──────────┐
-             │  Weather   │ │   Lift   │ │  Safety   │ │Ski Coach │
-             │  Agent     │ │  Traffic │ │  Agent    │ │  Agent   │
-             │ (Python)   │ │  (.NET)  │ │ (Python)  │ │ (Python) │
-             └───────────┘ └──────────┘ └───────────┘ └──────────┘
+┌──────────────────────┐  ┌──────────────────────────┐  ┌──────────────────────────┐
+│   Data Generator     │  │   Advisor Agent (.NET)   │  │ Voice Advisor Agent (.NET)│
+│   (Python/FastAPI)   │  │ Foundry hosted Responses │  │ Voice Live WebSocket      │
+└──────────┬───────────┘  └────────────┬─────────────┘  └────────────┬─────────────┘
+           │                           │                             │
+           │                  A2A + Foundry tools            A2A + Foundry tools
+           │                           │                             │
+           ▼                           ▼                             ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         Shared specialist/research tools                     │
+├─────────────┬─────────────┬─────────────┬─────────────┬─────────────────────┤
+│ Weather     │ Lift Traffic│ Safety      │ Ski Coach   │ Ski Researcher      │
+│ Agent       │ Agent       │ Agent       │ Agent       │ Foundry Prompt      │
+│ (Python)    │ (.NET)      │ (Python)    │ (Python)    │ Agent + Web Search  │
+└─────────────┴─────────────┴─────────────┴─────────────┴─────────────────────┘
 ```
 
 | Component | Language | Role |
 |---|---|---|
-| **Advisor Agent** | .NET | Central orchestrator — routes questions to specialist agents via A2A |
+| **Advisor Agent** | .NET | Foundry-hosted Responses orchestrator — routes chat questions to A2A specialists and the Ski Researcher prompt agent |
+| **Voice Advisor Agent** | .NET | Voice Live WebSocket bridge — provides spoken conversations and invokes the same specialist/research tools |
 | **Weather Agent** | Python | Current conditions, forecasts, storm alerts |
 | **Lift Traffic Agent** | .NET | Lift status, wait times, congestion analysis |
 | **Safety Agent** | Python | Risk evaluation, slope safety, closures |
 | **Ski Coach Agent** | Python | Personalized slope recommendations, day plans |
+| **Ski Researcher Agent** | Azure AI Foundry prompt agent | Web-search-backed general skiing research and background information |
 | **Data Generator** | Python | Continuously generates synthetic resort telemetry |
-| **Frontend** | React/Vite | Real-time dashboard with AI chat panel |
+| **Frontend** | React/Vite | Real-time dashboard with AI chat and voice controls |
 
 ## Prerequisites
 
@@ -94,8 +99,9 @@ aspire run
 ```
 
 This single command starts **all services**:
-- 2 .NET agents (advisor + lift traffic)
+- 3 .NET agents/services (advisor + lift traffic + voice advisor)
 - 3 Python agents (weather + safety + ski coach)
+- 1 Azure AI Foundry prompt agent (ski researcher with web search)
 - Data generator (Python/FastAPI)
 - Frontend (Vite dev server)
 - Cosmos DB emulator
@@ -110,7 +116,8 @@ The **frontend** will be available at the URL assigned by Aspire (shown in the d
 src/
 ├── apphost.cs                      # Aspire orchestration (all services wired here)
 ├── apphost.settings.Development.json  # Azure configuration
-├── advisor-agent-dotnet/           # .NET orchestrator agent (A2A)
+├── advisor-agent-dotnet/           # .NET hosted Responses advisor agent
+├── voice-advisor-agent/            # .NET Voice Live WebSocket advisor
 ├── lift-traffic-agent-dotnet/      # .NET lift traffic agent (A2A)
 ├── weather-agent-python/           # Python weather agent (A2A)
 ├── safety-agent-python/            # Python safety agent (A2A)
@@ -154,16 +161,21 @@ Changes are picked up automatically without restarting.
 
 2. **Specialist agents** (weather, lift, safety, coach) each wrap specific tools using MAF and expose them over the **A2A protocol**. Each agent calls the data generator's API to fetch current conditions.
 
-3. **Advisor Agent** is the central orchestrator. It registers all specialist agents as tools (via A2A) and selectively invokes only the relevant agents based on the user's question.
+3. **Ski Researcher Agent** is an Azure AI Foundry prompt agent with a web search tool. It handles general skiing questions that are not tied to live resort telemetry.
 
-4. **Frontend** displays real-time data panels (weather, lifts, slopes, safety) by polling the data generator, and provides an AI chat panel that streams responses from the advisor agent via the A2A protocol.
+4. **Advisor Agent** is the chat orchestrator. It is published as a Foundry-hosted Responses agent, registers the A2A specialist agents and Ski Researcher as tools, and selectively invokes only the relevant tools based on the user's question.
+
+5. **Voice Advisor Agent** bridges browser audio to Azure AI Voice Live over WebSockets. Voice Live can call the same A2A specialist agents and Ski Researcher prompt agent as function tools during a spoken conversation.
+
+6. **Frontend** displays real-time data panels (weather, lifts, slopes, safety) by polling the data generator, provides an AI chat panel backed by the advisor's Responses endpoint, and offers voice conversations through the voice advisor WebSocket.
 
 ## Key Technologies
 
 - **[Microsoft Agent Framework (MAF)](https://github.com/microsoft/agents)** — Agent creation, tool registration, and orchestration
+- **[Azure AI Voice Live](https://learn.microsoft.com/azure/ai-services/speech-service/voice-live)** — Realtime speech-to-speech voice conversations
 - **[A2A Protocol](https://github.com/google/A2A)** — Agent-to-agent communication over JSON-RPC + SSE streaming
 - **[Aspire](https://aspire.dev)** — Distributed app orchestration, service discovery, observability
-- **[Azure AI Foundry](https://ai.azure.com)** — LLM backend (GPT-4.1)
+- **[Azure AI Foundry](https://ai.azure.com)** — LLM backend, hosted Responses agent, prompt agent, web search, and realtime deployment
 - **[Vite](https://vitejs.dev) + [React](https://react.dev)** — Frontend dashboard
 - **[Azure Cosmos DB](https://learn.microsoft.com/azure/cosmos-db/)** — Conversation thread persistence
 

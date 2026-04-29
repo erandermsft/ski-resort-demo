@@ -25,6 +25,7 @@ dependencies = [
     # Microsoft Agent Framework dependencies
     "agent-framework",
     "agent-framework-azure",
+    "agent-framework-a2a"
 ]
 
 [build-system]

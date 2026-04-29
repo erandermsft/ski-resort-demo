@@ -1,16 +1,24 @@
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Hosting;
-using Microsoft.Agents.AI.Hosting.A2A;
+using Microsoft.Agents.AI.Foundry.Hosting;
 using Microsoft.Extensions.AI;
+using Azure.AI.Projects;
 using Azure.Identity;
+using System.Data.Common;
 using A2A;
 using SharedServices;
+
+using FoundryAgentSessionStore = Microsoft.Agents.AI.Foundry.Hosting.AgentSessionStore;
+using Azure.AI.Extensions.OpenAI;
+using Azure.AI.Projects.Agents;
+using Azure;
+
+#pragma warning disable OPENAI001
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 
-// Configure Azure chat client
 builder.AddAzureChatCompletionsClient(connectionName: "gpt41",
     configureSettings: settings =>
     {
@@ -18,6 +26,24 @@ builder.AddAzureChatCompletionsClient(connectionName: "gpt41",
         settings.EnableSensitiveTelemetryData = true;
     })
     .AddChatClient().ConfigureOptions(options => options.AllowMultipleToolCalls = true);
+
+var projectConnectionString = Environment.GetEnvironmentVariable("ConnectionStrings__proj-voice-ski-resort-demo")
+    ?? throw new InvalidOperationException("ConnectionStrings__proj-voice-ski-resort-demo is not set.");
+var chatConnectionString = Environment.GetEnvironmentVariable("ConnectionStrings__gpt41")
+    ?? throw new InvalidOperationException("ConnectionStrings__gpt41 is not set.");
+
+DbConnectionStringBuilder projectConnectionBuilder = new() { ConnectionString = projectConnectionString };
+DbConnectionStringBuilder chatConnectionBuilder = new() { ConnectionString = chatConnectionString };
+
+var projectEndpoint = GetRequiredConnectionValue(projectConnectionBuilder, "Endpoint");
+var deploymentName = GetRequiredConnectionValue(chatConnectionBuilder, "Deployment");
+
+if (!Uri.TryCreate(projectEndpoint, UriKind.Absolute, out var projectUri) || projectUri is null)
+{
+    throw new InvalidOperationException("ConnectionStrings__proj-voice-ski-resort-demo contains an invalid Endpoint value.");
+}
+
+var credential = new DefaultAzureCredential();
 
 // Register Cosmos containers for session storage
 builder.AddKeyedAzureCosmosContainer("sessions",
@@ -29,6 +55,9 @@ builder.AddKeyedAzureCosmosContainer("conversations",
 
 // Register session and chat history providers
 builder.Services.AddCosmosAgentSessionStore("sessions", opt => { opt.TtlSeconds = 86400 * 7; });
+builder.Services.AddSingleton<FoundryCosmosAgentSessionStore>();
+builder.Services.AddSingleton<FoundryAgentSessionStore>(sp => sp.GetRequiredService<FoundryCosmosAgentSessionStore>());
+builder.Services.AddKeyedSingleton<FoundryAgentSessionStore>("advisor-agent", (sp, _) => sp.GetRequiredService<FoundryCosmosAgentSessionStore>());
 builder.Services.AddCosmosChatHistoryProvider("conversations", (sp, opt) =>
 {
     opt.MessageTtlSeconds = 86400 * 7;
@@ -46,14 +75,25 @@ builder.Services.AddCors(options =>
 });
 
 // Helper to resolve a remote agent via A2A
-AIAgent ResolveA2AAgent(string envVar, string? cardPath = "/.well-known/agent-card.json")
+AIAgent ResolveA2AAgent(string envVar, string cardPath = "/.well-known/agent-card.json", string? endpointPath = null)
 {
     var url = Environment.GetEnvironmentVariable(envVar)
         ?? throw new InvalidOperationException($"{envVar} not configured.");
     var httpClient = new HttpClient { BaseAddress = new Uri(url), Timeout = TimeSpan.FromSeconds(60) };
     var resolver = new A2ACardResolver(httpClient.BaseAddress!, httpClient, agentCardPath: cardPath);
-    return resolver.GetAIAgentAsync(httpClient).Result;
+    var agentCard = resolver.GetAgentCardAsync().Result;
+    if (!string.IsNullOrWhiteSpace(endpointPath))
+    {
+        agentCard.Url = AppendPath(agentCard.Url, endpointPath);
+        foreach (var additionalInterface in agentCard.AdditionalInterfaces)
+            additionalInterface.Url = AppendPath(additionalInterface.Url, endpointPath);
+    }
+
+    return agentCard.AsAIAgent(httpClient);
 }
+
+static string AppendPath(string url, string path)
+    => $"{url.TrimEnd('/')}/{path.TrimStart('/')}";
 
 // Connect to specialist agents via A2A
 var weatherAgent = ResolveA2AAgent("services__weather-agent-python__https__0");
@@ -63,9 +103,15 @@ var liftAgent = ResolveA2AAgent(Environment.GetEnvironmentVariable("services__li
     "/agenta2a/v1/card");
 var safetyAgent = ResolveA2AAgent("services__safety-agent-python__https__0");
 var coachAgent = ResolveA2AAgent("services__ski-coach-agent-python__https__0");
+var foundryProjectClient = new AIProjectClient(projectUri, credential);
 
-// Register the orchestrator agent that uses all 4 remote agents as tools
-builder.AddAIAgent("advisor-agent", (sp, key) =>
+// var skiResearcherAgent = await foundryProjectClient.AgentAdministrationClient.GetAgentAsync("ski-researcher");
+var skiResearcherAgentReference = new AgentReference(name: Environment.GetEnvironmentVariable("SKI_RESEARCHER_AGENTNAME"));
+var responseClient = foundryProjectClient.ProjectOpenAIClient.GetProjectResponsesClientForAgent(skiResearcherAgentReference);
+var skiResearcherAgent = responseClient.AsIChatClient("gpt41").AsAIAgent(Environment.GetEnvironmentVariable("SKI_RESEARCHER_AGENTNAME"), description: "I can search the web. Use me for any generic question about skiing.");
+
+// Register the Foundry-hosted orchestrator agent that uses all 4 remote A2A agents as tools.
+var advisorAgentBuilder = builder.AddAIAgent("advisor-agent", (sp, key) =>
 {
     var chatClient = sp.GetRequiredService<IChatClient>();
 
@@ -82,8 +128,10 @@ You have access to four specialist agents as tools:
 - Lift Traffic Agent: lift status, wait times, congestion
 - Safety Agent: risk evaluation, slope safety, closures
 - Ski Coach Agent: personalized slope recommendations, day plans
+- Ski Researcher Agent: general ski-related questions
 
 IMPORTANT: Only call the agents that are relevant to the user's question. Do NOT call all agents for every question.
+Never use your internal knowledge to answer questions. For generic ski questions, use the Ski Researcher Agent tool to search the web for up-to-date information.
 
 Examples:
 - ""What's the weather like?"" → call Weather Agent only
@@ -91,6 +139,7 @@ Examples:
 - ""Is it safe to ski today?"" → call Safety Agent (and Weather Agent if you need conditions context)
 - ""I'm a beginner, where should I ski?"" → call Ski Coach Agent
 - ""Plan my full day"" → call multiple agents as needed
+- ""I have a general question about skiing"" → call Ski Researcher Agent
 - ""Hi"" or ""Thanks"" → respond directly, no agent calls needed
 
 When you DO call agents, synthesize their responses into one clear answer. Mention any safety concerns prominently. Be friendly, concise, and helpful.",
@@ -98,7 +147,8 @@ When you DO call agents, synthesize their responses into one clear answer. Menti
                 weatherAgent.AsAIFunction(),
                 liftAgent.AsAIFunction(),
                 safetyAgent.AsAIFunction(),
-                coachAgent.AsAIFunction()
+                coachAgent.AsAIFunction(),
+                skiResearcherAgent.AsAIFunction()
             ]
         },
     }.WithCosmosChatHistoryProvider(sp);
@@ -111,39 +161,49 @@ When you DO call agents, synthesize their responses into one clear answer. Menti
     return agent;
 }).WithCosmosSessionStore();
 
+builder.Services.AddFoundryResponses();
+
 var app = builder.Build();
 
 // Enable CORS
 app.UseCors();
 
-// Map A2A endpoint
-app.MapA2A("advisor-agent", "/agenta2a", new AgentCard
-{
-    Name = "advisor-agent",
-    Url = app.Configuration["ASPNETCORE_URLS"]?.Split(';')[0] + "/agenta2a" ?? "http://localhost:5200/agenta2a",
-    Description = "AlpineAI Ski Resort Advisor - your intelligent ski concierge coordinating weather, lifts, safety, and coaching",
-    Version = "1.0",
-    DefaultInputModes = ["text"],
-    DefaultOutputModes = ["text"],
-    Capabilities = new AgentCapabilities
-    {
-        Streaming = true,
-        PushNotifications = false
-    },
-    Skills = [
-        new A2A.AgentSkill
-        {
-            Name = "Ski Resort Advisory",
-            Description = "Coordinate weather, lift traffic, safety, and coaching information to provide personalized ski resort recommendations",
-            Examples = [
-                "I'm intermediate and hate crowds. Where should I ski?",
-                "Is it safe to ski today?",
-                "Plan my day - I'm an advanced skier",
-                "What's the weather like and which lifts have short wait times?"
-            ]
-        }
-    ]
-});
+// Map Foundry Responses API endpoint at /responses.
+app.MapFoundryResponses();
+app.MapGet("/liveness", () => Results.Ok("Healthy"));
+app.MapGet("/readiness", () => Results.Ok("Ready"));
 
-app.MapDefaultEndpoints();
+// app.MapDefaultEndpoints();
 app.Run();
+
+static string GetRequiredConnectionValue(DbConnectionStringBuilder connectionBuilder, string key)
+{
+    if (!connectionBuilder.TryGetValue(key, out var rawValue) || rawValue is null)
+    {
+        throw new InvalidOperationException($"Connection string is missing '{key}'.");
+    }
+
+    var value = rawValue.ToString();
+    if (string.IsNullOrWhiteSpace(value))
+    {
+        throw new InvalidOperationException($"Connection string has an empty '{key}' value.");
+    }
+
+    return value;
+}
+
+sealed class FoundryCosmosAgentSessionStore(CosmosAgentSessionStore inner) : FoundryAgentSessionStore
+{
+    public override ValueTask SaveSessionAsync(
+        AIAgent agent,
+        string conversationId,
+        AgentSession session,
+        CancellationToken cancellationToken = default)
+        => inner.SaveSessionAsync(agent, conversationId, session, cancellationToken);
+
+    public override ValueTask<AgentSession> GetSessionAsync(
+        AIAgent agent,
+        string conversationId,
+        CancellationToken cancellationToken = default)
+        => inner.GetSessionAsync(agent, conversationId, cancellationToken);
+}

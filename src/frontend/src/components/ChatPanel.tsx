@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, type FormEvent } from 'react';
-import { sendMessageStream, resetClient } from '../lib/a2a-client';
+import { sendMessageStream, resetClient } from '../lib/responses-client';
 import type { VoiceTranscript } from '../lib/VoiceSession';
 import VoiceButton from './VoiceButton';
 
@@ -41,7 +41,7 @@ export default function ChatPanel() {
       setMessages([{ role: 'agent', text: '', source: 'chat' }]);
       accRef.current = '';
       try {
-        for await (const event of sendMessageStream('', undefined)) {
+        for await (const event of sendMessageStream('Greet the user and briefly offer ski resort advisory help.', undefined)) {
           if (event.contextId) {
             setContextId(event.contextId);
           }
@@ -75,7 +75,7 @@ export default function ChatPanel() {
       setMessages([{ role: 'agent', text: '', source: 'chat' }]);
       accRef.current = '';
       try {
-        for await (const event of sendMessageStream('', undefined)) {
+        for await (const event of sendMessageStream('Greet the user and briefly offer ski resort advisory help.', undefined)) {
           if (event.contextId) {
             setContextId(event.contextId);
           }
@@ -187,7 +187,7 @@ export default function ChatPanel() {
         });
       }
     } catch (err) {
-      console.error('A2A error', err);
+      console.error('Responses API error', err);
       setMessages((prev) => {
         const next = [...prev];
         next[next.length - 1] = {

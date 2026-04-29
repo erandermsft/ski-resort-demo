@@ -15,7 +15,8 @@ from a2a.types import (
     AgentCapabilities,
     AgentCard,
     AgentSkill,
-    TransportProtocol,
+    AgentInterface,
+    TransportProtocol
 )
 
 # OpenTelemetry imports
@@ -60,6 +61,13 @@ def get_agent_card(host: str, port: int) -> AgentCard:
         version="1.0.0",
         default_input_modes=["text"],
         default_output_modes=["text"],
+        supported_interfaces=[
+            AgentInterface(
+                url=f"https://localhost:{port}/",
+                transport='HTTP+JSON',
+                protocol_version='1.0',
+            )
+        ],
         capabilities=AgentCapabilities(
             streaming=True,
             push_notifications=False

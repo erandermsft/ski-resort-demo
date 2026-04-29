@@ -1,8 +1,8 @@
-﻿#:sdk Aspire.AppHost.Sdk@13.2.0
-#:package Aspire.Hosting.Foundry@13.2.0-preview.1.26170.3
-#:package Aspire.Hosting.Azure.CosmosDB@13.2.0
-#:package Aspire.Hosting.Python@13.2.0
-#:package Aspire.Hosting.JavaScript@13.2.0
+#:sdk Aspire.AppHost.Sdk@13.3.0-preview.1.26229.3
+#:package Aspire.Hosting.Foundry@13.3.0-preview.1.26229.3
+#:package Aspire.Hosting.Azure.CosmosDB@13.3.0-preview.1.26229.3
+#:package Aspire.Hosting.Python@13.3.0-preview.1.26229.3
+#:package Aspire.Hosting.JavaScript@13.3.0-preview.1.26229.3
 
 #:project ./advisor-agent-dotnet/AdvisorAgent.Dotnet.csproj
 #:project ./lift-traffic-agent-dotnet/LiftTrafficAgent.Dotnet.csproj
@@ -19,7 +19,13 @@ var project = foundry.AddProject("proj-voice-ski-resort-demo");
 var deployment = project.AddModelDeployment("gpt41", FoundryModel.OpenAI.Gpt41)
     .WithProperties(configure => configure.SkuCapacity = 150);
 var voiceDeployment = project.AddModelDeployment("gptrealtime", FoundryModel.OpenAI.GptRealtime)
-    .WithProperties(configure => configure.SkuCapacity = 10);    
+    .WithProperties(configure => configure.SkuCapacity = 10);
+
+var webSearch = project.AddWebSearchTool("web-search");
+
+var skiResearcher =project.AddPromptAgent(deployment, name: "ski-researcher",
+    instructions: """You are a ski researcher agent. Your job is to research and provide information about ski.""")
+    .WithTool(webSearch);
 
 #pragma warning disable ASPIRECOSMOSDB001
 var cosmos = builder.AddAzureCosmosDB("cosmos-db")
@@ -81,24 +87,30 @@ var liftAgent = builder.AddProject<Projects.LiftTrafficAgent_Dotnet>("lift-traff
 // Advisor Agent (.NET) — Orchestrator
 // ---------------------------------------------------------------------------
 var advisorAgent = builder.AddProject<Projects.AdvisorAgent_Dotnet>("advisor-agent-dotnet")
+    .WithReference(project).WaitFor(project)
     .WithReference(deployment).WaitFor(deployment)
     .WithReference(conversations).WaitFor(conversations)
     .WithReference(sessions).WaitFor(sessions)
     .WithReference(weatherAgent).WaitFor(weatherAgent)
     .WithReference(liftAgent).WaitFor(liftAgent)
     .WithReference(safetyAgent).WaitFor(safetyAgent)
-    .WithReference(coachAgent).WaitFor(coachAgent);
+    .WithReference(coachAgent).WaitFor(coachAgent)
+    .WithReference(skiResearcher).WaitFor(skiResearcher)
+    .PublishAsHostedAgent();
 
 // ---------------------------------------------------------------------------
 // Voice Advisor Agent (.NET) — Voice orchestrator via WebSocket + Voice Live
 // ---------------------------------------------------------------------------
 var voiceAdvisorAgent = builder.AddProject<Projects.VoiceAdvisorAgent>("voice-advisor-agent")
+    .WithReference(project).WaitFor(project)
+    .WithReference(deployment).WaitFor(deployment)
     .WithReference(voiceDeployment).WaitFor(voiceDeployment)
     .WithReference(conversations).WaitFor(conversations)
     .WithReference(weatherAgent).WaitFor(weatherAgent)
     .WithReference(liftAgent).WaitFor(liftAgent)
     .WithReference(safetyAgent).WaitFor(safetyAgent)
-    .WithReference(coachAgent).WaitFor(coachAgent);
+    .WithReference(coachAgent).WaitFor(coachAgent)
+    .WithReference(skiResearcher).WaitFor(skiResearcher);
 
 // ---------------------------------------------------------------------------
 // Frontend Dashboard (Vite + React)
