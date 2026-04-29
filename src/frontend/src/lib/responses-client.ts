@@ -1,0 +1,125 @@
+export interface ResponsesStreamEvent {
+  content?: string;
+  contextId?: string;
+}
+
+const ADVISOR_AGENT_NAME = 'advisor-agent';
+
+interface ResponseStreamPayload {
+  type?: string;
+  delta?: string;
+  response?: { id?: string; output_text?: string; conversation?: { id?: string } };
+  item?: { id?: string; content?: Array<{ text?: string; type?: string }> };
+  content_index?: number;
+  output_index?: number;
+}
+
+function extractContent(payload: ResponseStreamPayload): string | undefined {
+  if (typeof payload.delta === 'string') {
+    return payload.delta;
+  }
+
+  if (typeof payload.response?.output_text === 'string') {
+    return payload.response.output_text;
+  }
+
+  const textParts = payload.item?.content
+    ?.map((part) => part.text)
+    .filter((text): text is string => typeof text === 'string' && text.length > 0);
+
+  return textParts?.join('');
+}
+
+function extractContextId(payload: ResponseStreamPayload): string | undefined {
+  return payload.response?.conversation?.id;
+}
+
+async function* parseSseStream(stream: ReadableStream<Uint8Array>): AsyncGenerator<ResponseStreamPayload> {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      buffer += decoder.decode(value, { stream: !done });
+
+      let boundary = buffer.indexOf('\n\n');
+      while (boundary !== -1) {
+        const rawEvent = buffer.slice(0, boundary).trim();
+        buffer = buffer.slice(boundary + 2);
+
+        const data = rawEvent
+          .split('\n')
+          .filter((line) => line.startsWith('data:'))
+          .map((line) => line.slice(5).trim())
+          .join('\n');
+
+        if (data && data !== '[DONE]') {
+          yield JSON.parse(data) as ResponseStreamPayload;
+        }
+
+        boundary = buffer.indexOf('\n\n');
+      }
+
+      if (done) {
+        break;
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+export async function* sendMessageStream(
+  text: string,
+  contextId?: string,
+): AsyncGenerator<ResponsesStreamEvent, void, undefined> {
+  const conversationId = contextId ?? crypto.randomUUID();
+
+  const response = await fetch('/responses', {
+    method: 'POST',
+    headers: {
+      Accept: 'text/event-stream',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: ADVISOR_AGENT_NAME,
+      agent_reference: { type: 'agent_reference', name: ADVISOR_AGENT_NAME },
+      conversation: conversationId,
+      input: [
+        {
+          type: 'message',
+          role: 'user',
+          content: [{ type: 'input_text', text }],
+        },
+      ],
+      stream: true,
+      metadata: { entity_id: ADVISOR_AGENT_NAME },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    throw new Error(`Responses API request failed: ${response.status}${errorText ? ` ${errorText}` : ''}`);
+  }
+
+  if (!response.body) {
+    throw new Error('Responses API did not return a stream.');
+  }
+
+  yield { contextId: conversationId };
+
+  for await (const payload of parseSseStream(response.body)) {
+    const nextContextId = extractContextId(payload) ?? conversationId;
+    const content = extractContent(payload);
+
+    if (nextContextId || content) {
+      yield { content, contextId: nextContextId };
+    }
+  }
+}
+
+export function resetClient() {
+  // No client instance is cached for the Responses API transport.
+}

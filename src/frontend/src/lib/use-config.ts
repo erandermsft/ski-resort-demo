@@ -23,7 +23,7 @@ async function fetchConfig(): Promise<AppConfig> {
 
 export function usePollingInterval(): number {
   const [interval, setInterval_] = useState(cachedConfig.pollingIntervalMs);
-  const timer = useRef<ReturnType<typeof setInterval>>();
+  const timer = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
   useEffect(() => {
     const refresh = async () => {

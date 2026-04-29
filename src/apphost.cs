@@ -19,7 +19,13 @@ var project = foundry.AddProject("proj-voice-ski-resort-demo");
 var deployment = project.AddModelDeployment("gpt41", FoundryModel.OpenAI.Gpt41)
     .WithProperties(configure => configure.SkuCapacity = 150);
 var voiceDeployment = project.AddModelDeployment("gptrealtime", FoundryModel.OpenAI.GptRealtime)
-    .WithProperties(configure => configure.SkuCapacity = 10);    
+    .WithProperties(configure => configure.SkuCapacity = 10);
+
+var webSearch = project.AddWebSearchTool("web-search");
+
+project.AddPromptAgent(deployment, name: "ski-researcher",
+    instructions: """You are a ski researcher agent. Your job is to research and provide information about ski.""")
+    .WithTool(webSearch);
 
 #pragma warning disable ASPIRECOSMOSDB001
 var cosmos = builder.AddAzureCosmosDB("cosmos-db")
@@ -81,13 +87,15 @@ var liftAgent = builder.AddProject<Projects.LiftTrafficAgent_Dotnet>("lift-traff
 // Advisor Agent (.NET) — Orchestrator
 // ---------------------------------------------------------------------------
 var advisorAgent = builder.AddProject<Projects.AdvisorAgent_Dotnet>("advisor-agent-dotnet")
+    .WithReference(project).WaitFor(project)
     .WithReference(deployment).WaitFor(deployment)
     .WithReference(conversations).WaitFor(conversations)
     .WithReference(sessions).WaitFor(sessions)
     .WithReference(weatherAgent).WaitFor(weatherAgent)
     .WithReference(liftAgent).WaitFor(liftAgent)
     .WithReference(safetyAgent).WaitFor(safetyAgent)
-    .WithReference(coachAgent).WaitFor(coachAgent);
+    .WithReference(coachAgent).WaitFor(coachAgent)
+    .PublishAsHostedAgent();
 
 // ---------------------------------------------------------------------------
 // Voice Advisor Agent (.NET) — Voice orchestrator via WebSocket + Voice Live
