@@ -106,8 +106,8 @@ public sealed class VoiceWebSocketHandler
     private async Task ConfigureSessionAsync(VoiceLiveSession session, string instructions)
     {
         // Convert A2A agents to Voice Live tool definitions (analogous to agent.AsAIFunction() in MAF)
-        var functionTools = _a2aAgents.Values
-            .Select(agent => agent.AsVoiceLiveTool())
+        var functionTools = _a2aAgents
+            .Select(agentEntry => agentEntry.Value.AsVoiceLiveTool(agentEntry.Key))
             .ToList();
 
         // Collect tool definitions for telemetry

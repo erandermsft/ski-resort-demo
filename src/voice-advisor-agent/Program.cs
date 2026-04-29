@@ -1,11 +1,18 @@
 using A2A;
+using Azure.AI.Extensions.OpenAI;
+using Azure.AI.Projects;
 using Azure.Identity;
 using Microsoft.Agents.AI;
+using Microsoft.Agents.AI.Foundry.Hosting;
 using Microsoft.Agents.AI.Hosting.A2A;
 using Microsoft.Azure.Cosmos;
+using Microsoft.Extensions.AI;
+using System.Data.Common;
 using OpenTelemetry.Trace;
 using SharedServices;
 using VoiceAdvisorAgent;
+
+#pragma warning disable MAAI001
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -38,6 +45,22 @@ var endpoint = ParseVoiceLiveEndpoint(builder.Configuration.GetConnectionString(
 
 var model = builder.Configuration["VoiceLive:Model"] ?? "gpt-realtime";
 var voice = builder.Configuration["VoiceLive:Voice"] ?? "en-US-Ava:DragonHDLatestNeural";
+
+var projectConnectionString = Environment.GetEnvironmentVariable("ConnectionStrings__proj-voice-ski-resort-demo")
+    ?? throw new InvalidOperationException("ConnectionStrings__proj-voice-ski-resort-demo is not set.");
+var chatConnectionString = Environment.GetEnvironmentVariable("ConnectionStrings__gpt41")
+    ?? throw new InvalidOperationException("ConnectionStrings__gpt41 is not set.");
+
+DbConnectionStringBuilder projectConnectionBuilder = new() { ConnectionString = projectConnectionString };
+DbConnectionStringBuilder chatConnectionBuilder = new() { ConnectionString = chatConnectionString };
+
+var projectEndpoint = GetRequiredConnectionValue(projectConnectionBuilder, "Endpoint");
+var deploymentName = GetRequiredConnectionValue(chatConnectionBuilder, "Deployment");
+
+if (!Uri.TryCreate(projectEndpoint, UriKind.Absolute, out var projectUri) || projectUri is null)
+{
+    throw new InvalidOperationException("ConnectionStrings__proj-voice-ski-resort-demo contains an invalid Endpoint value.");
+}
 
 // Connect to downstream agents via A2A
 var agents = new Dictionary<string, AIAgent>();
@@ -76,6 +99,15 @@ foreach (var (agentName, config) in agentConfigs)
         agents[agentName] = cardResolver.GetAIAgentAsync().Result;
     }
 }
+
+var skiResearcherAgentName = Environment.GetEnvironmentVariable("SKI_RESEARCHER_AGENTNAME")
+    ?? throw new InvalidOperationException("SKI_RESEARCHER_AGENTNAME is not set.");
+var foundryProjectClient = new AIProjectClient(projectUri, new DefaultAzureCredential());
+var skiResearcherAgentReference = new AgentReference(name: skiResearcherAgentName);
+var responseClient = foundryProjectClient.ProjectOpenAIClient.GetProjectResponsesClientForAgent(skiResearcherAgentReference);
+agents["ski_researcher_agent"] = responseClient
+    .AsIChatClientWithStoredOutputDisabled(deploymentName, includeReasoningEncryptedContent: false)
+    .AsAIAgent("ski_researcher_agent", description: "I can search the web. Use me for any generic question about skiing.");
 
 builder.Services.AddSingleton(agents);
 builder.Services.AddSingleton(new DefaultAzureCredential());
@@ -158,4 +190,20 @@ static string ParseVoiceLiveEndpoint(string connectionString)
         return connectionString.TrimEnd('/');
 
     return "https://localhost";
+}
+
+static string GetRequiredConnectionValue(DbConnectionStringBuilder connectionBuilder, string key)
+{
+    if (!connectionBuilder.TryGetValue(key, out var rawValue) || rawValue is null)
+    {
+        throw new InvalidOperationException($"Connection string is missing '{key}'.");
+    }
+
+    var value = rawValue.ToString();
+    if (string.IsNullOrWhiteSpace(value))
+    {
+        throw new InvalidOperationException($"Connection string has an empty '{key}' value.");
+    }
+
+    return value;
 }

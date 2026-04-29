@@ -102,12 +102,15 @@ var advisorAgent = builder.AddProject<Projects.AdvisorAgent_Dotnet>("advisor-age
 // Voice Advisor Agent (.NET) — Voice orchestrator via WebSocket + Voice Live
 // ---------------------------------------------------------------------------
 var voiceAdvisorAgent = builder.AddProject<Projects.VoiceAdvisorAgent>("voice-advisor-agent")
+    .WithReference(project).WaitFor(project)
+    .WithReference(deployment).WaitFor(deployment)
     .WithReference(voiceDeployment).WaitFor(voiceDeployment)
     .WithReference(conversations).WaitFor(conversations)
     .WithReference(weatherAgent).WaitFor(weatherAgent)
     .WithReference(liftAgent).WaitFor(liftAgent)
     .WithReference(safetyAgent).WaitFor(safetyAgent)
-    .WithReference(coachAgent).WaitFor(coachAgent);
+    .WithReference(coachAgent).WaitFor(coachAgent)
+    .WithReference(skiResearcher).WaitFor(skiResearcher);
 
 // ---------------------------------------------------------------------------
 // Frontend Dashboard (Vite + React)
