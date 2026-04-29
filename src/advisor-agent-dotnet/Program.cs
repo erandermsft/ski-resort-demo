@@ -106,9 +106,9 @@ var coachAgent = ResolveA2AAgent("services__ski-coach-agent-python__https__0");
 var foundryProjectClient = new AIProjectClient(projectUri, credential);
 
 // var skiResearcherAgent = await foundryProjectClient.AgentAdministrationClient.GetAgentAsync("ski-researcher");
-var skiResearcherAgentReference = new AgentReference(name: "ski-researcher");
+var skiResearcherAgentReference = new AgentReference(name: Environment.GetEnvironmentVariable("SKI_RESEARCHER_AGENTNAME"));
 var responseClient = foundryProjectClient.ProjectOpenAIClient.GetProjectResponsesClientForAgent(skiResearcherAgentReference);
-var skiResearcherAgent = responseClient.AsIChatClient("gpt41").AsAIAgent("ski-researcher", description: "I can search the web. Use me for any generic question about skiing.");
+var skiResearcherAgent = responseClient.AsIChatClient("gpt41").AsAIAgent(Environment.GetEnvironmentVariable("SKI_RESEARCHER_AGENTNAME"), description: "I can search the web. Use me for any generic question about skiing.");
 
 // Register the Foundry-hosted orchestrator agent that uses all 4 remote A2A agents as tools.
 var advisorAgentBuilder = builder.AddAIAgent("advisor-agent", (sp, key) =>
