@@ -42,18 +42,18 @@ var voice = builder.Configuration["VoiceLive:Voice"] ?? "en-US-Ava:DragonHDLates
 // Connect to downstream agents via A2A
 var agents = new Dictionary<string, AIAgent>();
 
-var agentConfigs = new Dictionary<string, string>
+var agentConfigs = new Dictionary<string, (string EnvVar, string CardPath)>
 {
-    ["weather_agent"] = "services__weather-agent-python__https__0",
-    ["lift_traffic_agent"] = "services__lift-traffic-agent-dotnet__https__0",
-    ["safety_agent"] = "services__safety-agent-python__https__0",
-    ["ski_coach_agent"] = "services__ski-coach-agent-python__https__0",
+    ["weather_agent"] = ("services__weather-agent-python__https__0", "/.well-known/agent-card.json"),
+    ["lift_traffic_agent"] = ("services__lift-traffic-agent-dotnet__https__0", "/agenta2a/.well-known/agent-card.json"),
+    ["safety_agent"] = ("services__safety-agent-python__https__0", "/.well-known/agent-card.json"),
+    ["ski_coach_agent"] = ("services__ski-coach-agent-python__https__0", "/.well-known/agent-card.json"),
 };
 
-foreach (var (agentName, envVar) in agentConfigs)
+foreach (var (agentName, config) in agentConfigs)
 {
-    var url = Environment.GetEnvironmentVariable(envVar)
-        ?? Environment.GetEnvironmentVariable(envVar.Replace("https", "http"));
+    var url = Environment.GetEnvironmentVariable(config.EnvVar)
+        ?? Environment.GetEnvironmentVariable(config.EnvVar.Replace("https", "http"));
 
     if (!string.IsNullOrEmpty(url))
     {

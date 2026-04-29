@@ -4,6 +4,7 @@ using Microsoft.Agents.AI.Hosting.A2A;
 using Microsoft.Extensions.AI;
 using Azure.Identity;
 using A2A;
+using A2A.AspNetCore;
 using SharedServices;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -46,14 +47,25 @@ builder.Services.AddCors(options =>
 });
 
 // Helper to resolve a remote agent via A2A
-AIAgent ResolveA2AAgent(string envVar, string? cardPath = "/.well-known/agent-card.json")
+AIAgent ResolveA2AAgent(string envVar, string cardPath = "/.well-known/agent-card.json", string? endpointPath = null)
 {
     var url = Environment.GetEnvironmentVariable(envVar)
         ?? throw new InvalidOperationException($"{envVar} not configured.");
     var httpClient = new HttpClient { BaseAddress = new Uri(url), Timeout = TimeSpan.FromSeconds(60) };
     var resolver = new A2ACardResolver(httpClient.BaseAddress!, httpClient, agentCardPath: cardPath);
-    return resolver.GetAIAgentAsync(httpClient).Result;
+    var agentCard = resolver.GetAgentCardAsync().Result;
+    if (!string.IsNullOrWhiteSpace(endpointPath))
+    {
+        agentCard.Url = AppendPath(agentCard.Url, endpointPath);
+        foreach (var additionalInterface in agentCard.AdditionalInterfaces)
+            additionalInterface.Url = AppendPath(additionalInterface.Url, endpointPath);
+    }
+
+    return agentCard.AsAIAgent(httpClient);
 }
+
+static string AppendPath(string url, string path)
+    => $"{url.TrimEnd('/')}/{path.TrimStart('/')}";
 
 // Connect to specialist agents via A2A
 var weatherAgent = ResolveA2AAgent("services__weather-agent-python__https__0");
@@ -65,7 +77,7 @@ var safetyAgent = ResolveA2AAgent("services__safety-agent-python__https__0");
 var coachAgent = ResolveA2AAgent("services__ski-coach-agent-python__https__0");
 
 // Register the orchestrator agent that uses all 4 remote agents as tools
-builder.AddAIAgent("advisor-agent", (sp, key) =>
+var advisorAgentBuilder = builder.AddAIAgent("advisor-agent", (sp, key) =>
 {
     var chatClient = sp.GetRequiredService<IChatClient>();
 
@@ -109,20 +121,30 @@ When you DO call agents, synthesize their responses into one clear answer. Menti
     ficc?.AllowConcurrentInvocation = true;
 
     return agent;
-}).WithCosmosSessionStore();
+}).WithCosmosSessionStore()
+  ;
 
 var app = builder.Build();
 
 // Enable CORS
 app.UseCors();
 
-// Map A2A endpoint
-app.MapA2A("advisor-agent", "/agenta2a", new AgentCard
+var agentBaseUrl = app.Configuration["ASPNETCORE_URLS"]?.Split(';')[0] ?? "http://localhost:5200";
+var agentUrl = $"{agentBaseUrl}/agenta2a";
+var agentCard = new AgentCard
 {
     Name = "advisor-agent",
-    Url = app.Configuration["ASPNETCORE_URLS"]?.Split(';')[0] + "/agenta2a" ?? "http://localhost:5200/agenta2a",
     Description = "AlpineAI Ski Resort Advisor - your intelligent ski concierge coordinating weather, lifts, safety, and coaching",
+    Url = agentUrl,
     Version = "1.0",
+    PreferredTransport = AgentTransport.JsonRpc,
+    AdditionalInterfaces = [
+        new AgentInterface
+        {
+            Url = agentUrl,
+            Transport = AgentTransport.JsonRpc
+        }
+    ],
     DefaultInputModes = ["text"],
     DefaultOutputModes = ["text"],
     Capabilities = new AgentCapabilities
@@ -143,7 +165,10 @@ app.MapA2A("advisor-agent", "/agenta2a", new AgentCard
             ]
         }
     ]
-});
+};
+
+// Map A2A endpoint
+app.MapA2A(advisorAgentBuilder, "/agenta2a", agentCard);
 
 app.MapDefaultEndpoints();
 app.Run();

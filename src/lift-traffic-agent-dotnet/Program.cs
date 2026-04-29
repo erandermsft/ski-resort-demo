@@ -4,6 +4,7 @@ using Microsoft.Agents.AI.Hosting.A2A;
 using Microsoft.Extensions.AI;
 using Azure.Identity;
 using A2A;
+using A2A.AspNetCore;
 using LiftTrafficAgent.Dotnet.Services;
 using LiftTrafficAgent.Dotnet.Tools;
 using Microsoft.Agents.AI.OpenAI;
@@ -29,7 +30,7 @@ builder.Services.AddSingleton<LiftDataService>();
 builder.Services.AddSingleton<LiftTrafficTools>();
 
 // Register the agent
-builder.AddAIAgent("lift-traffic-agent", (sp, key) =>
+var liftAgentBuilder = builder.AddAIAgent("lift-traffic-agent", (sp, key) =>
 {
     var chatClient = sp.GetRequiredService<IChatClient>();
     var tools = sp.GetRequiredService<LiftTrafficTools>().GetFunctions();
@@ -60,13 +61,22 @@ var app = builder.Build();
 // Enable CORS
 app.UseCors();
 
-// Map A2A endpoint
-app.MapA2A("lift-traffic-agent", "/agenta2a", new AgentCard
+var agentBaseUrl = app.Configuration["ASPNETCORE_URLS"]?.Split(';')[0] ?? "http://localhost:5196";
+var agentUrl = $"{agentBaseUrl}/agenta2a";
+var agentCard = new AgentCard
 {
     Name = "lift-traffic-agent",
-    Url = app.Configuration["ASPNETCORE_URLS"]?.Split(';')[0] + "/agenta2a" ?? "http://localhost:5196/agenta2a",
     Description = "Lift congestion and traffic intelligence agent",
+    Url = agentUrl,
     Version = "1.0",
+    PreferredTransport = AgentTransport.JsonRpc,
+    AdditionalInterfaces = [
+        new AgentInterface
+        {
+            Url = agentUrl,
+            Transport = AgentTransport.JsonRpc
+        }
+    ],
     DefaultInputModes = ["text"],
     DefaultOutputModes = ["text"],
     Capabilities = new AgentCapabilities
@@ -75,7 +85,7 @@ app.MapA2A("lift-traffic-agent", "/agenta2a", new AgentCard
         PushNotifications = false
     },
     Skills = [
-        new AgentSkill
+        new A2A.AgentSkill
         {
             Name = "Lift Traffic Analysis",
             Description = "Real-time lift status, wait times, and congestion analysis",
@@ -87,7 +97,10 @@ app.MapA2A("lift-traffic-agent", "/agenta2a", new AgentCard
             ]
         }
     ]
-});
+};
+
+// Map A2A endpoint
+app.MapA2A(liftAgentBuilder, "/agenta2a", agentCard);
 
 app.MapDefaultEndpoints();
 app.Run();
