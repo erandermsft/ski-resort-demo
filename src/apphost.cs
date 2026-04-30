@@ -111,19 +111,42 @@ var liftAgent = builder.AddProject<Projects.LiftTrafficAgent_Dotnet>("lift-traff
     .WithReference(dataGenerator).WaitFor(dataGenerator)
     .WithComputeEnvironment(aca);
 
+const string deployedContainerAppsBaseDomain = "orangedune-44aa345a.swedencentral.azurecontainerapps.io";
+
+static string DeployedAgentUrl(string resourceName)
+    => $"https://{resourceName}.{deployedContainerAppsBaseDomain}/";
+
 // ---------------------------------------------------------------------------
 // Advisor Agent (.NET) — Orchestrator
 // ---------------------------------------------------------------------------
 var advisorAgent = builder.AddProject<Projects.AdvisorAgent_Dotnet>("advisor-agent")
     .WithHttpEndpoint(targetPort: 9000)
     .WithReference(project).WaitFor(project)
-    .WithReference(deployment).WaitFor(deployment)
-    .WithReference(weatherAgent).WaitFor(weatherAgent)
-    .WithReference(liftAgent).WaitFor(liftAgent)
-    .WithReference(safetyAgent).WaitFor(safetyAgent)
-    .WithReference(coachAgent).WaitFor(coachAgent)
-    .WithReference(skiResearcher).WaitFor(skiResearcher)
-    .PublishAsHostedAgent(project);
+    .WithReference(deployment).WaitFor(deployment);
+
+if (builder.ExecutionContext.IsPublishMode)
+{
+    // Work around hosted agent publish waiting forever on already-deployed ACA endpoint allocation.
+    advisorAgent = advisorAgent
+        .WithEnvironment("services__weather-agent__https__0", DeployedAgentUrl("weather-agent"))
+        .WithEnvironment("services__lift-traffic-agent__https__0", DeployedAgentUrl("lift-traffic-agent"))
+        .WithEnvironment("services__safety-agent__https__0", DeployedAgentUrl("safety-agent"))
+        .WithEnvironment("services__ski-coach-agent__https__0", DeployedAgentUrl("ski-coach-agent"))
+        .WithEnvironment("SKI_RESEARCHER_PROJECTENDPOINT", "https://aif-voice-ski-resort-dem.services.ai.azure.com/api/projects/proj-voice-ski-resort-demo")
+        .WithEnvironment("SKI_RESEARCHER_CONNECTIONSTRING", "https://aif-voice-ski-resort-dem.services.ai.azure.com/api/projects/proj-voice-ski-resort-demo/agents/ski-researcher")
+        .WithEnvironment("SKI_RESEARCHER_AGENTNAME", "ski-researcher");
+}
+else
+{
+    advisorAgent = advisorAgent
+        .WithReference(weatherAgent).WaitFor(weatherAgent)
+        .WithReference(liftAgent).WaitFor(liftAgent)
+        .WithReference(safetyAgent).WaitFor(safetyAgent)
+        .WithReference(coachAgent).WaitFor(coachAgent)
+        .WithReference(skiResearcher).WaitFor(skiResearcher);
+}
+
+advisorAgent.PublishAsHostedAgent(project);
 
 // ---------------------------------------------------------------------------
 // Voice Advisor Agent (.NET) — Voice orchestrator via WebSocket + Voice Live
