@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AlpineAI: MAF, Aspire, Foundry</title>
+    <link rel="stylesheet" href="./node_modules/reveal.js/dist/reveal.css" />
+    <link rel="stylesheet" href="./node_modules/reveal.js/dist/theme/black.css" />
+    <link rel="stylesheet" href="./node_modules/reveal.js/plugin/highlight/monokai.css" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="reveal">
+      <div class="slides">
+        <section class="hero center" data-background-gradient="linear-gradient(135deg, #09111f 0%, #123f70 48%, #60d9ff 100%)">
+          <p class="eyebrow">AlpineAI demo</p>
+          <h1>Building intelligent agents on Azure</h1>
+          <p class="subtitle">from local development to production with Microsoft Agent Framework, Aspire, and Azure AI Foundry</p>
+          <div class="pill-row">
+            <span>MAF</span>
+            <span>Aspire</span>
+            <span>Foundry</span>
+          </div>
+        </section>
+
+        <section>
+          <section class="section-title maf">
+            <p class="eyebrow">Part 1</p>
+            <h2>Microsoft Agent Framework</h2>
+            <p class="subtitle">One programming model for agents, no matter where the intelligence runs.</p>
+          </section>
+
+          <section>
+            <h2>The abstraction is the point</h2>
+            <div class="split">
+              <div>
+                <p class="lead">Agents compose the same way even when the implementation changes.</p>
+                <div class="value-grid">
+                  <div><strong>Local</strong><span>wrap a chat client and tools</span></div>
+                  <div><strong>Remote</strong><span>call an HTTP service via A2A</span></div>
+                  <div><strong>Hosted</strong><span>call a managed Foundry agent</span></div>
+                  <div><strong>Workflow</strong><span>coordinate deterministic steps</span></div>
+                </div>
+              </div>
+              <pre><code class="language-csharp" data-trim>
+var advisor = chatClient.AsAIAgent(
+    name: "advisor-agent",
+    instructions: "Route each question to the right specialist.",
+    tools: [
+        weatherAgent.AsAIFunction(),
+        liftAgent.AsAIFunction(),
+        skiResearcherAgent.AsAIFunction()
+    ]);
+              </code></pre>
+            </div>
+          </section>
+
+          <section>
+            <h2>What is an agent?</h2>
+            <p class="lead center-text">The app calls <code>agent.run(question)</code>. MAF adapts that call to the right client and remote capability.</p>
+            <div class="agent-map">
+              <div class="agent-kind">ChatAgent</div>
+              <div class="agent-arrow"><span>agent.run(question)</span></div>
+              <div class="agent-client">Chat client</div>
+              <div class="agent-arrow compact"><span>HTTP</span></div>
+              <div class="agent-target">LLM</div>
+
+              <div class="agent-kind">CopilotAgent</div>
+              <div class="agent-arrow"><span>agent.run(question)</span></div>
+              <div class="agent-client">Copilot SDK</div>
+              <div class="agent-arrow compact"><span>SDK call</span></div>
+              <div class="agent-target">Remote Copilot agent</div>
+
+              <div class="agent-kind">A2AAgent</div>
+              <div class="agent-arrow"><span>agent.run(question)</span></div>
+              <div class="agent-client">A2A SDK</div>
+              <div class="agent-arrow compact"><span>HTTP</span></div>
+              <div class="agent-target">Remote A2A service</div>
+
+              <div class="agent-kind">FoundryAgent</div>
+              <div class="agent-arrow"><span>agent.run(question)</span></div>
+              <div class="agent-client">Foundry SDK</div>
+              <div class="agent-arrow compact"><span>SDK call</span></div>
+              <div class="agent-target">Foundry hosted agent</div>
+
+              <div class="agent-kind">Workflow</div>
+              <div class="agent-arrow"><span>agent.run(question)</span></div>
+              <div class="agent-client">Workflow runtime</div>
+              <div class="agent-arrow compact"><span>rules</span></div>
+              <div class="agent-target">Coordinated agents</div>
+            </div>
+          </section>
+
+          <section class="question-slide">
+            <h2>Now the real questions</h2>
+            <div class="question-list">
+              <p>How can I know what's happening?</p>
+              <p>How do I create all the agents I need for my app?</p>
+              <p>How and where do I deploy them?</p>
+            </div>
+          </section>
+
+        </section>
+
+        <section>
+          <section class="section-title aspire">
+            <p class="eyebrow">Part 2</p>
+            <h2>Aspire</h2>
+            <p class="subtitle">Code-first orchestration for the whole distributed app: local run, observability, and deployment.</p>
+          </section>
+
+          <section>
+            <h2>Infrastructure as code, not as screenshots</h2>
+            <div class="split">
+              <div>
+                <p class="lead">The AppHost is the source of truth for the demo topology.</p>
+                <div class="value-grid">
+                  <div><strong>Services</strong><span>advisor, lift, voice, Python agents</span></div>
+                  <div><strong>Data</strong><span>Cosmos DB containers and emulator</span></div>
+                  <div><strong>AI</strong><span>Foundry project, models, prompt agents</span></div>
+                  <div><strong>Hosting</strong><span>local process graph and Azure Container Apps</span></div>
+                </div>
+              </div>
+              <pre><code class="language-csharp" data-trim>
+var builder = DistributedApplication.CreateBuilder(args);
+
+var project = builder.AddFoundry("aif-voice-ski-resort-demo")
+    .AddProject("proj-voice-ski-resort-demo");
+
+var deployment = project.AddModelDeployment(
+    "gpt41", FoundryModel.OpenAI.Gpt41);
+
+var weatherAgent = builder.AddUvicornApp(
+    "weather-agent",
+    "./weather-agent-python",
+    "weather_agent_python.main:app");
+              </code></pre>
+            </div>
+            <p class="source">Source: <code>src/apphost.cs</code></p>
+          </section>
+
+          <section>
+            <h2>Polyglot at two levels</h2>
+            <div class="split">
+              <div class="stacked-cards">
+                <div><strong>Write the AppHost in C#</strong><span>what this repo uses today</span></div>
+                <div><strong>Write the AppHost in TypeScript</strong><span>same code-first orchestration model, more languages coming</span></div>
+                <div><strong>Host resources in any stack</strong><span>.NET, Python, JavaScript, containers, Azure resources</span></div>
+              </div>
+              <pre><code class="language-csharp" data-trim>
+var weatherAgent = builder.AddUvicornApp(
+    "weather-agent",
+    "./weather-agent-python",
+    "weather_agent_python.main:app");
+
+var liftAgent = builder.AddProject&lt;Projects.LiftTrafficAgent_Dotnet&gt;(
+    "lift-traffic-agent");
+
+builder.AddViteApp("frontend", "./frontend", "dev");
+              </code></pre>
+            </div>
+            <p class="takeaway">Polyglot is not only “run many languages”; it is also “choose the language for the orchestration layer.”</p>
+          </section>
+
+          <section>
+            <h2>Dependencies are explicit</h2>
+            <pre class="wide-code"><code class="language-csharp" data-trim>
+var weatherAgent = builder.AddUvicornApp(
+    "weather-agent",
+    "./weather-agent-python",
+    "weather_agent_python.main:app")
+    .WithUv()
+    .WithExternalHttpEndpoints()
+    .WithHttpHealthCheck("/health")
+    .WithReference(deployment).WaitFor(deployment)
+    .WithReference(dataGenerator).WaitFor(dataGenerator)
+    .WithComputeEnvironment(aca);
+
+var voiceAdvisorAgent = builder
+    .AddProject&lt;Projects.VoiceAdvisorAgent&gt;("voice-advisor-agent")
+    .WithReference(voiceDeployment).WaitFor(voiceDeployment)
+    .WithReference(conversations).WaitFor(conversations)
+    .WithReference(weatherAgent).WaitFor(weatherAgent);
+            </code></pre>
+            <p class="takeaway">Startup order, connection strings, service discovery, health, and deployment placement live in one graph.</p>
+          </section>
+
+          <section>
+            <h2>Local loop with telemetry built in</h2>
+            <div class="dashboard-showcase">
+              <figure>
+                <img src="./assets/aspire-dashboard-resources.webp" alt="Aspire Dashboard resources view" />
+                <figcaption>resources + endpoints</figcaption>
+              </figure>
+              <figure>
+                <img src="./assets/aspire-dashboard-traces.webp" alt="Aspire Dashboard traces view" />
+                <figcaption>distributed traces</figcaption>
+              </figure>
+              <figure>
+                <img src="./assets/aspire-dashboard-logs.webp" alt="Aspire Dashboard structured logs view" />
+                <figcaption>structured logs</figcaption>
+              </figure>
+            </div>
+            <div class="callout">The dashboard lights up automatically while the demo runs locally: health, endpoints, logs, metrics, traces, and resource state.</div>
+            <p class="source">Images: <code>aspire.dev/dashboard</code></p>
+          </section>
+
+          <section>
+            <h2>Deploy the graph</h2>
+            <pre class="wide-code"><code class="language-csharp" data-trim>
+var aca = builder.AddAzureContainerAppEnvironment("aca");
+
+var weatherAgent = builder.AddUvicornApp(
+    "weather-agent",
+    "./weather-agent-python",
+    "weather_agent_python.main:app")
+    .WithReference(deployment).WaitFor(deployment)
+    .WithReference(dataGenerator).WaitFor(dataGenerator)
+    .WithComputeEnvironment(aca);
+
+var advisorAgent = builder
+    .AddProject&lt;Projects.AdvisorAgent_Dotnet&gt;("advisor-agent")
+    .WithReference(project).WaitFor(project)
+    .WithReference(deployment).WaitFor(deployment);
+
+advisorAgent.PublishAsHostedAgent(project);
+            </code></pre>
+            <p class="takeaway">Specialist services deploy to Azure Container Apps; the advisor is published as a Foundry hosted agent.</p>
+          </section>
+        </section>
+
+        <section>
+          <section class="section-title foundry">
+            <p class="eyebrow">Part 3</p>
+            <h2>Azure AI Foundry</h2>
+            <p class="subtitle">Model hosting, prompt agents, hosted agents, and common tools become deployable resources in the app graph.</p>
+          </section>
+
+          <section>
+            <h2>Foundry in the AppHost</h2>
+            <pre class="wide-code"><code class="language-csharp" data-trim>
+var foundry = builder.AddFoundry("aif-voice-ski-resort-demo");
+
+var project = foundry.AddProject("proj-voice-ski-resort-demo");
+
+var deployment = project.AddModelDeployment(
+    "gpt41",
+    FoundryModel.OpenAI.Gpt41)
+    .WithProperties(configure => configure.SkuCapacity = 150);
+
+var voiceDeployment = project.AddModelDeployment(
+    "gptrealtime",
+    FoundryModel.OpenAI.GptRealtime)
+    .WithProperties(configure => configure.SkuCapacity = 10);
+            </code></pre>
+            <p class="takeaway">The model layer is part of the same infrastructure code as the application services.</p>
+          </section>
+
+          <section>
+            <h2>Prompt agents: fast to define, easy to tool</h2>
+            <pre class="wide-code"><code class="language-csharp" data-trim>
+var webSearch = project.AddWebSearchTool("web-search");
+
+var skiResearcher = project
+    .AddPromptAgent(
+        deployment,
+        name: "ski-researcher",
+        instructions: "Research and answer general ski questions.")
+    .WithTool(webSearch);
+            </code></pre>
+            <p class="source">Source: <code>src/apphost.cs</code></p>
+          </section>
+
+          <section>
+            <h2>Hosted agents: expose the orchestrator as a managed endpoint</h2>
+            <pre class="wide-code"><code class="language-csharp" data-trim>
+var agent = chatClient.AsAIAgent(
+    name: "advisor-agent",
+    instructions: "Route each question to the right specialist.",
+    tools: [
+        weatherAgent.AsAIFunction(),
+        liftAgent.AsAIFunction(),
+        skiResearcherAgent.AsAIFunction()
+    ]);
+
+builder.Services.AddFoundryResponses(agent);
+
+app.MapFoundryResponses();
+            </code></pre>
+            <p class="takeaway">The advisor is a normal MAF agent first; Foundry Responses exposes it through a hosted-compatible HTTP shape.</p>
+          </section>
+
+          <section>
+            <h2>Hosted and prompt agents become tools too</h2>
+            <pre class="wide-code"><code class="language-csharp" data-trim>
+var foundryProjectClient = new AIProjectClient(projectUri, credential);
+
+var skiResearcherAgent = foundryProjectClient.ProjectOpenAIClient
+    .GetProjectResponsesClientForAgent(
+        new AgentReference(name: "ski-researcher"))
+    .AsIChatClient("gpt41")
+    .AsAIAgent(
+        name: "ski-researcher",
+        description: "Web-backed research for generic skiing questions.");
+            </code></pre>
+            <p class="source">Source: <code>src/advisor-agent-dotnet/Program.cs</code></p>
+          </section>
+
+        </section>
+
+        <section>
+          <section class="section-title demo demo-title">
+            <p class="eyebrow">Demo</p>
+            <h2>AlpineAI agent graph</h2>
+            <p class="subtitle">The same MAF, Aspire, and Foundry concepts applied to this repo.</p>
+          </section>
+
+          <section>
+            <h2>Demo: AlpineAI architecture</h2>
+            <p class="lead center-text">The frontend talks to three entry points; the advisor experiences invoke the same shared specialist and research agents.</p>
+            <div class="architecture-schema">
+              <div class="arch-node frontend">
+                <strong>Frontend</strong>
+                <span>Vite + React dashboard</span>
+                <small>data + chat + voice</small>
+              </div>
+
+              <div class="arch-lane">
+                <span>REST</span>
+                <span>Responses API</span>
+                <span>WebSocket</span>
+              </div>
+
+              <div class="arch-middle">
+                <div class="arch-node">
+                  <strong>Data Generator</strong>
+                  <span>Python / FastAPI</span>
+                  <small>synthetic resort telemetry</small>
+                </div>
+                <div class="arch-node advisor">
+                  <strong>Advisor Agent</strong>
+                  <span>.NET + Foundry Responses</span>
+                  <small>chat orchestrator</small>
+                </div>
+                <div class="arch-node voice">
+                  <strong>Voice Advisor</strong>
+                  <span>.NET + Voice Live</span>
+                  <small>voice WebSocket bridge</small>
+                </div>
+              </div>
+
+              <div class="arch-lane shared">
+                <span>feeds data</span>
+                <span>A2A + Foundry tools</span>
+                <span>A2A + Foundry tools</span>
+              </div>
+
+              <div class="arch-tools">
+                <div><strong>Weather</strong><span>Python</span></div>
+                <div><strong>Lift Traffic</strong><span>.NET</span></div>
+                <div><strong>Safety</strong><span>Python</span></div>
+                <div><strong>Ski Coach</strong><span>Python</span></div>
+                <div><strong>Ski Researcher</strong><span>Foundry Prompt + Web Search</span></div>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h2>Demo: specialists stay small</h2>
+            <div class="vertical-code-stack">
+              <pre><code class="language-python" data-trim>
+client = FoundryChatClient(
+    project_endpoint=os.getenv("GPT41_URI"),
+    credential=AzureCliCredential(),
+    model="gpt41")
+
+self.agent = client.as_agent(
+    name="weather-agent",
+    instructions="Provide weather, forecast, and storm guidance.",
+    tools=[get_current_conditions, get_forecast, is_storm_incoming],
+)
+              </code></pre>
+              <pre><code class="language-csharp" data-trim>
+var agent = chatClient.AsAIAgent(
+    name: "lift-traffic-agent",
+    instructions: "Provide lift status, wait times, and congestion analysis.",
+    tools: tools.ToArray());
+
+app.MapA2A(liftAgentBuilder, "/agenta2a", agentCard);
+              </code></pre>
+            </div>
+            <p class="source">Source: weather Python agent and lift .NET agent</p>
+          </section>
+
+          <section>
+            <h2>Demo: resolve remote agents via HTTP</h2>
+            <pre class="wide-code"><code class="language-csharp" data-trim>
+AIAgent ResolveA2AAgent(string envVar, string cardPath = "/.well-known/agent-card.json")
+{
+    var url = Environment.GetEnvironmentVariable(envVar);
+
+    var httpClient = new HttpClient { BaseAddress = new Uri(url) };
+    var resolver = new A2ACardResolver(httpClient.BaseAddress!, httpClient, agentCardPath: cardPath);
+
+    return resolver.GetAgentCardAsync().Result.AsAIAgent(httpClient);
+}
+
+var weatherAgent = ResolveA2AAgent("services__weather-agent__https__0");
+// ...
+
+var skiResearcherAgent = foundryProjectClient.ProjectOpenAIClient
+    .GetProjectResponsesClientForAgent(new AgentReference(name: "ski-researcher"))
+    .AsIChatClient("gpt41")
+    .AsAIAgent(
+        name: "ski-researcher",
+        description: "Web-backed ski research.");
+
+var advisor = chatClient.AsAIAgent(
+    name: "advisor-agent",
+    instructions: "Route each question to the right specialist.",
+    tools: [
+        weatherAgent.AsAIFunction(),
+        skiResearcherAgent.AsAIFunction(),
+        // ...
+    ]);
+            </code></pre>
+            <p class="source">Source: <code>src/advisor-agent-dotnet/Program.cs</code></p>
+          </section>
+
+          <section>
+            <h2>Demo: voice advisor</h2>
+            <div class="split">
+              <div>
+                <p class="lead">The voice agent is a WebSocket bridge to Voice Live, but it reuses the same specialist agents as tools.</p>
+                <div class="value-grid">
+                  <div><strong>Browser</strong><span>streams audio over <code>/ws/voice</code></span></div>
+                  <div><strong>Voice Live</strong><span>handles realtime speech turns</span></div>
+                  <div><strong>Tools</strong><span>A2A + Foundry agents become voice functions</span></div>
+                  <div><strong>Tracing</strong><span>tool calls are emitted as voice session spans</span></div>
+                </div>
+              </div>
+              <pre><code class="language-csharp" data-trim>
+app.Map("/ws/voice", async context =>
+{
+    var agents = context.RequestServices
+        .GetRequiredService&lt;Dictionary&lt;string, AIAgent&gt;&gt;();
+
+    var handler = new VoiceWebSocketHandler(
+        webSocket,
+        credential,
+        endpoint,
+        model,
+        voice,
+        systemPrompt,
+        agents,
+        logger,
+        conversationId,
+        cosmosContainer);
+
+    await handler.RunAsync(context.RequestAborted);
+});
+
+var functionTools = _a2aAgents
+    .Select(x => x.Value.AsVoiceLiveTool(x.Key))
+    .ToList();
+
+foreach (var tool in functionTools)
+    options.Tools.Add(tool);
+              </code></pre>
+            </div>
+            <p class="source">Source: <code>src/voice-advisor-agent/Program.cs</code>, <code>VoiceWebSocketHandler.cs</code></p>
+          </section>
+        </section>
+      </div>
+    </div>
+
+    <script type="module">
+      import Reveal from './node_modules/reveal.js/dist/reveal.esm.js';
+      import RevealHighlight from './node_modules/reveal.js/plugin/highlight/highlight.esm.js';
+      import RevealNotes from './node_modules/reveal.js/plugin/notes/notes.esm.js';
+
+      Reveal.initialize({
+        hash: true,
+        slideNumber: true,
+        transition: 'convex',
+        backgroundTransition: 'zoom',
+        controlsTutorial: false,
+        plugins: [RevealHighlight, RevealNotes]
+      });
+    </script>
+  </body>
+</html>

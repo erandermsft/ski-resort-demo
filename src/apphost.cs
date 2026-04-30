@@ -177,6 +177,13 @@ if (builder.ExecutionContext.IsRunMode)
             e.Urls.Clear();
             e.Urls.Add(new() { Url = "/", DisplayText = "⛷️ Ski Resort Dashboard", Endpoint = e.GetEndpoint("http") });
         });
+
+    builder.AddViteApp("slides", "../slides", "start")
+        .WithUrls((e) =>
+        {
+            e.Urls.Clear();
+            e.Urls.Add(new() { Url = "/", DisplayText = "Slides", Endpoint = e.GetEndpoint("http") });
+        });
 }
 
 builder.Build().Run();

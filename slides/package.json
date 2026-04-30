@@ -1,0 +1,14 @@
+{
+  "name": "ski-resort-demo-slides",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "start": "vite --host 0.0.0.0",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "reveal.js": "^5.2.1",
+    "vite": "^7.1.12"
+  }
+}
