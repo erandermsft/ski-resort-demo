@@ -4,6 +4,8 @@ namespace LiftTrafficAgent.Dotnet.Services;
 
 public class LiftDataService
 {
+    private const string DataGeneratorUrl = "https+http://data-generator";
+
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<LiftDataService> _logger;
     private readonly string _dataGeneratorUrl;
@@ -12,20 +14,23 @@ public class LiftDataService
     {
         _httpClientFactory = httpClientFactory;
         _logger = logger;
-        
-        // Get data-generator URL from Aspire service discovery
-        _dataGeneratorUrl = Environment.GetEnvironmentVariable("services__data-generator__https__0")
-            ?? throw new InvalidOperationException("services__data-generator__http__0 not found in environment variables");
+        _dataGeneratorUrl = DataGeneratorUrl;
         
         _logger.LogInformation("LiftDataService initialized with data-generator URL: {Url}", _dataGeneratorUrl);
+    }
+
+    private HttpClient CreateDataGeneratorClient()
+    {
+        var httpClient = _httpClientFactory.CreateClient();
+        httpClient.BaseAddress = new Uri(_dataGeneratorUrl);
+        return httpClient;
     }
 
     public async Task<string> GetAllLiftsAsync()
     {
         try
         {
-            var httpClient = _httpClientFactory.CreateClient();
-            httpClient.BaseAddress = new Uri(_dataGeneratorUrl);
+            var httpClient = CreateDataGeneratorClient();
             
             _logger.LogInformation("Fetching all lifts from {Url}/api/lifts", _dataGeneratorUrl);
             
@@ -48,8 +53,7 @@ public class LiftDataService
     {
         try
         {
-            var httpClient = _httpClientFactory.CreateClient();
-            httpClient.BaseAddress = new Uri(_dataGeneratorUrl);
+            var httpClient = CreateDataGeneratorClient();
             
             _logger.LogInformation("Fetching lift {LiftId} from {Url}/api/lifts/{LiftId}", liftId, _dataGeneratorUrl, liftId);
             
@@ -72,8 +76,7 @@ public class LiftDataService
     {
         try
         {
-            var httpClient = _httpClientFactory.CreateClient();
-            httpClient.BaseAddress = new Uri(_dataGeneratorUrl);
+            var httpClient = CreateDataGeneratorClient();
             
             _logger.LogInformation("Fetching all lifts to determine least busy area");
             

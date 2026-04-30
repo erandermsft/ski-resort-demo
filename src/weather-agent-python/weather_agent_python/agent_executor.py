@@ -3,7 +3,7 @@ Weather Agent Executor for A2A SDK.
 """
 import logging
 import os
-from typing import override
+from typing_extensions import override
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
