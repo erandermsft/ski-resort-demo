@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AlpineAI: MAF, Aspire, Foundry</title>
+    <title>Microsoft Agentic Platform: From Idea to Production-Ready AI Systems on Azure</title>
     <link rel="stylesheet" href="./node_modules/reveal.js/dist/reveal.css" />
     <link rel="stylesheet" href="./node_modules/reveal.js/dist/theme/black.css" />
     <link rel="stylesheet" href="./node_modules/reveal.js/plugin/highlight/monokai.css" />
@@ -13,13 +13,13 @@
     <div class="reveal">
       <div class="slides">
         <section class="hero center" data-background-gradient="linear-gradient(135deg, #09111f 0%, #123f70 48%, #60d9ff 100%)">
-          <p class="eyebrow">AlpineAI demo</p>
-          <h1>Building intelligent agents on Azure</h1>
-          <p class="subtitle">from local development to production with Microsoft Agent Framework, Aspire, and Azure AI Foundry</p>
+          <h1>Microsoft Agentic Platform</h1>
+          <p class="subtitle">From Idea to Production-Ready AI Systems on Azure</p>
+          <p class="speaker-name">Tommaso Stocchi</p>
           <div class="pill-row">
             <span>MAF</span>
             <span>Aspire</span>
-            <span>Foundry</span>
+            <span>Microsoft Foundry</span>
           </div>
         </section>
 
@@ -232,7 +232,7 @@ advisorAgent.PublishAsHostedAgent(project);
         <section>
           <section class="section-title foundry">
             <p class="eyebrow">Part 3</p>
-            <h2>Azure AI Foundry</h2>
+            <h2>Microsoft Foundry</h2>
             <p class="subtitle">Model hosting, prompt agents, hosted agents, and common tools become deployable resources in the app graph.</p>
           </section>
 
@@ -366,7 +366,7 @@ var skiResearcherAgent = foundryProjectClient.ProjectOpenAIClient
           </section>
 
           <section>
-            <h2>Demo: specialists stay small</h2>
+            <h2>Specialists stay small</h2>
             <div class="vertical-code-stack">
               <pre><code class="language-python" data-trim>
 client = FoundryChatClient(
@@ -393,7 +393,7 @@ app.MapA2A(liftAgentBuilder, "/agenta2a", agentCard);
           </section>
 
           <section>
-            <h2>Demo: resolve remote agents via HTTP</h2>
+            <h2>Resolve remote agents via HTTP</h2>
             <pre class="wide-code"><code class="language-csharp" data-trim>
 AIAgent ResolveA2AAgent(string envVar, string cardPath = "/.well-known/agent-card.json")
 {
@@ -428,7 +428,7 @@ var advisor = chatClient.AsAIAgent(
           </section>
 
           <section>
-            <h2>Demo: voice advisor</h2>
+            <h2>Voice advisor</h2>
             <div class="split">
               <div>
                 <p class="lead">The voice agent is a WebSocket bridge to Voice Live, but it reuses the same specialist agents as tools.</p>
@@ -470,6 +470,24 @@ foreach (var tool in functionTools)
             </div>
             <p class="source">Source: <code>src/voice-advisor-agent/Program.cs</code>, <code>VoiceWebSocketHandler.cs</code></p>
           </section>
+        </section>
+
+        <section class="thanks-slide" data-background-gradient="linear-gradient(135deg, #070b16 0%, #172554 48%, #0f766e 100%)">
+          <div class="thanks-layout">
+            <img src="./assets/tommaso-small-cut.png" alt="Tommaso presenting on stage" />
+            <div>
+              <p class="eyebrow">Thank you</p>
+              <h2>Questions?</h2>
+              <div class="pill-row thanks-pill-row">
+                <span>MAF</span>
+                <span>Aspire</span>
+                <span>Foundry</span>
+              </div>
+              <div class="thanks-links">
+                <span>github.com/tommasodotNET/ski-resort-demo</span>
+              </div>
+            </div>
+          </div>
         </section>
       </div>
     </div>

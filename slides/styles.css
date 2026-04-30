@@ -67,6 +67,13 @@
   margin-inline: auto;
 }
 
+.speaker-name {
+  color: rgba(248, 251, 255, 0.78);
+  font-size: 0.54em !important;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
 .eyebrow {
   color: var(--ice);
   font-size: 0.42em !important;
@@ -545,6 +552,50 @@
   margin: 2rem 0;
 }
 
+.thanks-layout {
+  display: grid;
+  grid-template-columns: 360px minmax(0, 1fr);
+  gap: 2rem;
+  align-items: center;
+  text-align: left;
+}
+
+.thanks-slide h2 {
+  font-size: 2.8em;
+  margin: 0.1em 0;
+}
+
+.thanks-slide .subtitle {
+  margin-inline: 0;
+}
+
+.thanks-pill-row {
+  justify-content: flex-start;
+  margin-top: 1.2rem;
+}
+
+.thanks-layout img {
+  width: 360px;
+  height: 360px;
+  object-fit: cover;
+  object-position: 58% 18%;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 32px;
+  box-shadow: 0 40px 90px rgba(0, 0, 0, 0.4);
+}
+
+.thanks-links {
+  display: inline-flex;
+  margin-top: 1.8rem;
+  padding: 0.7rem 1rem;
+  border: 1px solid rgba(155, 232, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(248, 251, 255, 0.82);
+  font-size: 0.42em;
+  font-weight: 800;
+}
+
 @media (max-width: 900px) {
   .split,
   .vertical-code-stack,
@@ -556,6 +607,25 @@
   .dashboard-showcase,
   .finale .story-grid {
     grid-template-columns: 1fr;
+  }
+
+  .thanks-layout {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+
+  .thanks-slide .subtitle {
+    margin-inline: auto;
+  }
+
+  .thanks-pill-row {
+    justify-content: center;
+  }
+
+  .thanks-layout img {
+    width: 280px;
+    height: 280px;
+    margin-inline: auto;
   }
 
   .arrow {
