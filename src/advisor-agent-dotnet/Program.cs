@@ -1,31 +1,15 @@
 using Microsoft.Agents.AI;
-using Microsoft.Agents.AI.Hosting;
 using Microsoft.Agents.AI.Foundry.Hosting;
 using Microsoft.Extensions.AI;
 using Azure.AI.Projects;
 using Azure.Identity;
 using System.Data.Common;
 using A2A;
-using SharedServices;
-
-using FoundryAgentSessionStore = Microsoft.Agents.AI.Foundry.Hosting.AgentSessionStore;
 using Azure.AI.Extensions.OpenAI;
-using Azure.AI.Projects.Agents;
-using Azure;
 
 #pragma warning disable OPENAI001
 
-var builder = WebApplication.CreateBuilder(args);
-
-builder.AddServiceDefaults();
-
-builder.AddAzureChatCompletionsClient(connectionName: "gpt41",
-    configureSettings: settings =>
-    {
-        settings.TokenCredential = new DefaultAzureCredential();
-        settings.EnableSensitiveTelemetryData = true;
-    })
-    .AddChatClient().ConfigureOptions(options => options.AllowMultipleToolCalls = true);
+string port = Environment.GetEnvironmentVariable("DEFAULT_AD_PORT") ?? "8088";
 
 var projectConnectionString = Environment.GetEnvironmentVariable("ConnectionStrings__proj-voice-ski-resort-demo")
     ?? throw new InvalidOperationException("ConnectionStrings__proj-voice-ski-resort-demo is not set.");
@@ -44,35 +28,6 @@ if (!Uri.TryCreate(projectEndpoint, UriKind.Absolute, out var projectUri) || pro
 }
 
 var credential = new DefaultAzureCredential();
-
-// Register Cosmos containers for session storage
-builder.AddKeyedAzureCosmosContainer("sessions",
-    configureClientOptions: (option) => option.Serializer = new CosmosSystemTextJsonSerializer());
-
-// Register Cosmos containers for conversation storage
-builder.AddKeyedAzureCosmosContainer("conversations",
-    configureClientOptions: (option) => option.Serializer = new CosmosSystemTextJsonSerializer());
-
-// Register session and chat history providers
-builder.Services.AddCosmosAgentSessionStore("sessions", opt => { opt.TtlSeconds = 86400 * 7; });
-builder.Services.AddSingleton<FoundryCosmosAgentSessionStore>();
-builder.Services.AddSingleton<FoundryAgentSessionStore>(sp => sp.GetRequiredService<FoundryCosmosAgentSessionStore>());
-builder.Services.AddKeyedSingleton<FoundryAgentSessionStore>("advisor-agent", (sp, _) => sp.GetRequiredService<FoundryCosmosAgentSessionStore>());
-builder.Services.AddCosmosChatHistoryProvider("conversations", (sp, opt) =>
-{
-    opt.MessageTtlSeconds = 86400 * 7;
-});
-
-// Configure CORS
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(policy =>
-    {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
-    });
-});
 
 // Helper to resolve a remote agent via A2A
 AIAgent ResolveA2AAgent(string envVar, string cardPath = "/.well-known/agent-card.json", string? endpointPath = null)
@@ -110,18 +65,16 @@ var skiResearcherAgentReference = new AgentReference(name: Environment.GetEnviro
 var responseClient = foundryProjectClient.ProjectOpenAIClient.GetProjectResponsesClientForAgent(skiResearcherAgentReference);
 var skiResearcherAgent = responseClient.AsIChatClient("gpt41").AsAIAgent(Environment.GetEnvironmentVariable("SKI_RESEARCHER_AGENTNAME"), description: "I can search the web. Use me for any generic question about skiing.");
 
-// Register the Foundry-hosted orchestrator agent that uses all 4 remote A2A agents as tools.
-var advisorAgentBuilder = builder.AddAIAgent("advisor-agent", (sp, key) =>
-{
-    var chatClient = sp.GetRequiredService<IChatClient>();
-
-    var agentOptions = new ChatClientAgentOptions()
-    {
-        Name = key,
-        Description = "AlpineAI Ski Resort Advisor - your intelligent ski concierge",
-        ChatOptions = new ChatOptions()
-        {
-            Instructions = @"You are the Ski Resort Advisor, the main AI concierge for AlpineAI ski resort.
+var agent = new AIProjectClient(new Uri(projectEndpoint), new DefaultAzureCredential())
+    .GetProjectOpenAIClient()
+    .GetProjectResponsesClient()
+    .AsIChatClient(deploymentName) // Converts into a Microsoft.Extensions.AI.IChatClient
+    .AsBuilder()
+    .UseOpenTelemetry(sourceName: "Foundry.Agents", configure: (cfg) => cfg.EnableSensitiveData = true)    // Enable OpenTelemetry instrumentation with sensitive data
+    .Build()
+    .AsAIAgent(
+        name: "advisor-agent",
+        instructions: @"You are the Ski Resort Advisor, the main AI concierge for AlpineAI ski resort.
 
 You have access to four specialist agents as tools:
 - Weather Agent: current conditions, forecasts, storm alerts
@@ -143,25 +96,31 @@ Examples:
 - ""Hi"" or ""Thanks"" → respond directly, no agent calls needed
 
 When you DO call agents, synthesize their responses into one clear answer. Mention any safety concerns prominently. Be friendly, concise, and helpful.",
-            Tools = [
-                weatherAgent.AsAIFunction(),
-                liftAgent.AsAIFunction(),
-                safetyAgent.AsAIFunction(),
-                coachAgent.AsAIFunction(),
-                skiResearcherAgent.AsAIFunction()
-            ]
-        },
-    }.WithCosmosChatHistoryProvider(sp);
+        tools: [
+            weatherAgent.AsAIFunction(),
+            liftAgent.AsAIFunction(),
+            safetyAgent.AsAIFunction(),
+            coachAgent.AsAIFunction(),
+            skiResearcherAgent.AsAIFunction()
+        ]);
 
-    var agent = chatClient.AsAIAgent(agentOptions, services: sp);
+var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.UseUrls($"http://+:{port}");
 
-    var ficc = agent.GetService<FunctionInvokingChatClient>();
-    ficc?.AllowConcurrentInvocation = true;
+// builder.AddServiceDefaults();
 
-    return agent;
-}).WithCosmosSessionStore();
+// Configure CORS
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
 
-builder.Services.AddFoundryResponses();
+builder.Services.AddFoundryResponses(agent);
 
 var app = builder.Build();
 
@@ -190,20 +149,4 @@ static string GetRequiredConnectionValue(DbConnectionStringBuilder connectionBui
     }
 
     return value;
-}
-
-sealed class FoundryCosmosAgentSessionStore(CosmosAgentSessionStore inner) : FoundryAgentSessionStore
-{
-    public override ValueTask SaveSessionAsync(
-        AIAgent agent,
-        string conversationId,
-        AgentSession session,
-        CancellationToken cancellationToken = default)
-        => inner.SaveSessionAsync(agent, conversationId, session, cancellationToken);
-
-    public override ValueTask<AgentSession> GetSessionAsync(
-        AIAgent agent,
-        string conversationId,
-        CancellationToken cancellationToken = default)
-        => inner.GetSessionAsync(agent, conversationId, cancellationToken);
 }

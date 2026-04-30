@@ -1,9 +1,9 @@
 #:sdk Aspire.AppHost.Sdk@13.4.0-preview.1.26229.15
 #:package Aspire.Hosting.Azure.AppContainers@13.4.0-preview.1.26229.15
-#:package Aspire.Hosting.Foundry@13.4.0-preview.1.26229.15
-#:package Aspire.Hosting.Azure.CosmosDB@13.4.0-preview.1.26229.15
-#:package Aspire.Hosting.Python@13.4.0-preview.1.26229.15
-#:package Aspire.Hosting.JavaScript@13.4.0-preview.1.26229.15
+#:package Aspire.Hosting.Foundry@13.4.0-preview.1.26229.1
+#:package Aspire.Hosting.Azure.CosmosDB@13.4.0-preview.1.26229.1
+#:package Aspire.Hosting.Python@13.4.0-preview.1.26229.1
+#:package Aspire.Hosting.JavaScript@13.4.0-preview.1.26229.1
 
 #:project ./advisor-agent-dotnet/AdvisorAgent.Dotnet.csproj
 #:project ./lift-traffic-agent-dotnet/LiftTrafficAgent.Dotnet.csproj
@@ -62,6 +62,7 @@ var sessions = db.AddContainer("sessions", "/conversationId");
 // ---------------------------------------------------------------------------
 var dataGenerator = builder.AddUvicornApp("data-generator", "./data-generator", "data_generator.main:app")
     .WithUv()
+    .WithExternalHttpEndpoints()
     .WithHttpHealthCheck("/health")
     .WithComputeEnvironment(aca);
 
@@ -70,6 +71,7 @@ var dataGenerator = builder.AddUvicornApp("data-generator", "./data-generator", 
 // ---------------------------------------------------------------------------
 var weatherAgent = builder.AddUvicornApp("weather-agent", "./weather-agent-python", "weather_agent_python.main:app")
     .WithUv()
+    .WithExternalHttpEndpoints()
     .WithHttpHealthCheck("/health")
     .WithReference(deployment).WaitFor(deployment)
     .WithEnvironment("AZURE_TENANT_ID", tenantId)
@@ -81,6 +83,7 @@ var weatherAgent = builder.AddUvicornApp("weather-agent", "./weather-agent-pytho
 // ---------------------------------------------------------------------------
 var safetyAgent = builder.AddUvicornApp("safety-agent", "./safety-agent-python", "safety_agent_python.main:app")
     .WithUv()
+    .WithExternalHttpEndpoints()
     .WithHttpHealthCheck("/health")
     .WithReference(deployment).WaitFor(deployment)
     .WithEnvironment("AZURE_TENANT_ID", tenantId)
@@ -92,6 +95,7 @@ var safetyAgent = builder.AddUvicornApp("safety-agent", "./safety-agent-python",
 // ---------------------------------------------------------------------------
 var coachAgent = builder.AddUvicornApp("ski-coach-agent", "./ski-coach-agent-python", "ski_coach_agent_python.main:app")
     .WithUv()
+    .WithExternalHttpEndpoints()
     .WithHttpHealthCheck("/health")
     .WithReference(deployment).WaitFor(deployment)
     .WithEnvironment("AZURE_TENANT_ID", tenantId)
@@ -102,6 +106,7 @@ var coachAgent = builder.AddUvicornApp("ski-coach-agent", "./ski-coach-agent-pyt
 // Lift Traffic Agent (.NET)
 // ---------------------------------------------------------------------------
 var liftAgent = builder.AddProject<Projects.LiftTrafficAgent_Dotnet>("lift-traffic-agent")
+    .WithExternalHttpEndpoints()
     .WithReference(deployment).WaitFor(deployment)
     .WithReference(dataGenerator).WaitFor(dataGenerator)
     .WithComputeEnvironment(aca);
@@ -110,10 +115,9 @@ var liftAgent = builder.AddProject<Projects.LiftTrafficAgent_Dotnet>("lift-traff
 // Advisor Agent (.NET) — Orchestrator
 // ---------------------------------------------------------------------------
 var advisorAgent = builder.AddProject<Projects.AdvisorAgent_Dotnet>("advisor-agent")
+    .WithHttpEndpoint(targetPort: 9000)
     .WithReference(project).WaitFor(project)
     .WithReference(deployment).WaitFor(deployment)
-    .WithReference(conversations).WaitFor(conversations)
-    .WithReference(sessions).WaitFor(sessions)
     .WithReference(weatherAgent).WaitFor(weatherAgent)
     .WithReference(liftAgent).WaitFor(liftAgent)
     .WithReference(safetyAgent).WaitFor(safetyAgent)
