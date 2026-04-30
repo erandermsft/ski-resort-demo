@@ -10,6 +10,9 @@
 #:project ./voice-advisor-agent/VoiceAdvisorAgent.csproj
 
 using Aspire.Hosting.Foundry;
+using Azure.Provisioning.Authorization;
+using Azure.Provisioning.CognitiveServices;
+using Azure.Provisioning.Expressions;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
