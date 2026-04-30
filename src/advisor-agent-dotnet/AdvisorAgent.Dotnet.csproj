@@ -13,7 +13,7 @@
     <PackageReference Include="Microsoft.Agents.AI.Foundry.Hosting" Version="1.2.0-preview.260421.1" />
     <PackageReference Include="Microsoft.Agents.AI.Hosting" Version="1.2.0-preview.260421.1" />
     <PackageReference Include="Aspire.Azure.AI.Inference" Version="13.2.4-preview.1.26224.4" />
-    <PackageReference Include="Aspire.Microsoft.Azure.Cosmos" Version="13.3.0-preview.1.26229.3" />
+    <PackageReference Include="Aspire.Microsoft.Azure.Cosmos" Version="13.4.0-preview.1.26229.15" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\service-defaults\service-defaults.csproj" />

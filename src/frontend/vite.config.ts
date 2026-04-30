@@ -14,7 +14,7 @@ export default defineConfig({
         secure: false,
       },
       '/responses': {
-        target: process.env.ADVISOR_AGENT_DOTNET_HTTPS || process.env.ADVISOR_AGENT_DOTNET_HTTP,
+        target: process.env.ADVISOR_AGENT_HTTPS || process.env.ADVISOR_AGENT_HTTP,
         changeOrigin: true,
         secure: false,
       },

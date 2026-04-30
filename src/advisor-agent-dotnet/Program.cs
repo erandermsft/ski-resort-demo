@@ -96,13 +96,13 @@ static string AppendPath(string url, string path)
     => $"{url.TrimEnd('/')}/{path.TrimStart('/')}";
 
 // Connect to specialist agents via A2A
-var weatherAgent = ResolveA2AAgent("services__weather-agent-python__https__0");
-var liftAgent = ResolveA2AAgent(Environment.GetEnvironmentVariable("services__lift-traffic-agent-dotnet__https__0") != null
-        ? "services__lift-traffic-agent-dotnet__https__0"
-        : "services__lift-traffic-agent-dotnet__http__0",
+var weatherAgent = ResolveA2AAgent("services__weather-agent__https__0");
+var liftAgent = ResolveA2AAgent(Environment.GetEnvironmentVariable("services__lift-traffic-agent__https__0") != null
+        ? "services__lift-traffic-agent__https__0"
+        : "services__lift-traffic-agent__http__0",
     "/agenta2a/v1/card");
-var safetyAgent = ResolveA2AAgent("services__safety-agent-python__https__0");
-var coachAgent = ResolveA2AAgent("services__ski-coach-agent-python__https__0");
+var safetyAgent = ResolveA2AAgent("services__safety-agent__https__0");
+var coachAgent = ResolveA2AAgent("services__ski-coach-agent__https__0");
 var foundryProjectClient = new AIProjectClient(projectUri, credential);
 
 // var skiResearcherAgent = await foundryProjectClient.AgentAdministrationClient.GetAgentAsync("ski-researcher");

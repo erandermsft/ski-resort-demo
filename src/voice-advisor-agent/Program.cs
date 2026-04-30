@@ -67,10 +67,10 @@ var agents = new Dictionary<string, AIAgent>();
 
 var agentConfigs = new Dictionary<string, (string EnvVar, string CardPath)>
 {
-    ["weather_agent"] = ("services__weather-agent-python__https__0", "/.well-known/agent-card.json"),
-    ["lift_traffic_agent"] = ("services__lift-traffic-agent-dotnet__https__0", "/agenta2a/.well-known/agent-card.json"),
-    ["safety_agent"] = ("services__safety-agent-python__https__0", "/.well-known/agent-card.json"),
-    ["ski_coach_agent"] = ("services__ski-coach-agent-python__https__0", "/.well-known/agent-card.json"),
+    ["weather_agent"] = ("services__weather-agent__https__0", "/.well-known/agent-card.json"),
+    ["lift_traffic_agent"] = ("services__lift-traffic-agent__https__0", "/agenta2a/.well-known/agent-card.json"),
+    ["safety_agent"] = ("services__safety-agent__https__0", "/.well-known/agent-card.json"),
+    ["ski_coach_agent"] = ("services__ski-coach-agent__https__0", "/.well-known/agent-card.json"),
 };
 
 foreach (var (agentName, config) in agentConfigs)
