@@ -124,9 +124,9 @@ var advisorAgent = builder.AddProject<Projects.AdvisorAgent_Dotnet>("advisor-age
     .WithReference(project).WaitFor(project)
     .WithReference(deployment).WaitFor(deployment);
 
+// Work around for https://github.com/microsoft/aspire/issues/16608
 if (builder.ExecutionContext.IsPublishMode)
 {
-    // Work around hosted agent publish waiting forever on already-deployed ACA endpoint allocation.
     advisorAgent = advisorAgent
         .WithEnvironment("services__weather-agent__https__0", DeployedAgentUrl("weather-agent"))
         .WithEnvironment("services__lift-traffic-agent__https__0", DeployedAgentUrl("lift-traffic-agent"))
