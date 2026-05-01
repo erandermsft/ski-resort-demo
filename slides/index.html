@@ -496,14 +496,15 @@ foreach (var tool in functionTools)
       import Reveal from './node_modules/reveal.js/dist/reveal.esm.js';
       import RevealHighlight from './node_modules/reveal.js/plugin/highlight/highlight.esm.js';
       import RevealNotes from './node_modules/reveal.js/plugin/notes/notes.esm.js';
+      import RevealZoom from './node_modules/reveal.js/plugin/zoom/zoom.esm.js';
 
       Reveal.initialize({
         hash: true,
         slideNumber: true,
-        transition: 'convex',
+        transition: 'slide',
         backgroundTransition: 'zoom',
         controlsTutorial: false,
-        plugins: [RevealHighlight, RevealNotes]
+        plugins: [RevealHighlight, RevealNotes, RevealZoom]
       });
     </script>
   </body>
