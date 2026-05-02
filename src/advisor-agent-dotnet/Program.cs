@@ -107,7 +107,7 @@ When you DO call agents, synthesize their responses into one clear answer. Menti
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls($"http://+:{port}");
 
-// builder.AddServiceDefaults();
+builder.AddServiceDefaults();
 
 // Configure CORS
 builder.Services.AddCors(options =>
