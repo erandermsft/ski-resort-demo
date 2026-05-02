@@ -70,6 +70,7 @@ var agent = new AIProjectClient(new Uri(projectEndpoint), new DefaultAzureCreden
     .GetProjectResponsesClient()
     .AsIChatClient(deploymentName) // Converts into a Microsoft.Extensions.AI.IChatClient
     .AsBuilder()
+    .ConfigureOptions(options => options.AllowMultipleToolCalls = true)
     .UseOpenTelemetry(sourceName: "Foundry.Agents", configure: (cfg) => cfg.EnableSensitiveData = true)    // Enable OpenTelemetry instrumentation with sensitive data
     .Build()
     .AsAIAgent(
@@ -103,6 +104,9 @@ When you DO call agents, synthesize their responses into one clear answer. Menti
             coachAgent.AsAIFunction(),
             skiResearcherAgent.AsAIFunction()
         ]);
+
+var ficc = agent.GetService<FunctionInvokingChatClient>();
+ficc?.AllowConcurrentInvocation = true;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls($"http://+:{port}");
