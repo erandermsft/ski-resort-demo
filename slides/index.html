@@ -17,15 +17,60 @@
           <p class="subtitle">From Idea to Production-Ready AI Systems on Azure</p>
           <p class="speaker-name">Tommaso Stocchi</p>
           <div class="pill-row">
+            <span>Microsoft Foundry</span>
             <span>MAF</span>
             <span>Aspire</span>
-            <span>Microsoft Foundry</span>
           </div>
         </section>
 
         <section>
-          <section class="section-title maf">
+          <section class="section-title foundry">
             <p class="eyebrow">Part 1</p>
+            <h2>Microsoft Foundry</h2>
+            <p class="subtitle">A managed platform for models, agents, tools, identity, observability, and publishing.</p>
+          </section>
+
+          <section>
+            <h2>What is Microsoft Foundry?</h2>
+            <div class="value-grid">
+              <div><strong>Model catalog</strong><span>choose and deploy models for reasoning, voice, and tools</span></div>
+              <div><strong>Agent runtime</strong><span>hosts prompt agents, workflow agents, and hosted agents</span></div>
+              <div><strong>Tools</strong><span>web search, file search, code interpreter, MCP, and custom functions</span></div>
+              <div><strong>Enterprise layer</strong><span>identity, RBAC, safety, networking, observability, and publishing</span></div>
+            </div>
+            <p class="takeaway">Foundry is the managed control plane for taking agents from prototype to governed production endpoints.</p>
+          </section>
+
+          <section>
+            <h2>Prompt agents vs hosted agents</h2>
+            <table class="transport-table">
+              <thead>
+                <tr><th></th><th>Prompt agents</th><th>Hosted agents</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><strong>Definition</strong></td><td>Instructions, model, tools</td><td>Your agent code in a container</td></tr>
+                <tr><td><strong>Code required</strong></td><td>No</td><td>Yes</td></tr>
+                <tr><td><strong>Orchestration</strong></td><td>Managed by Foundry</td><td>You control the runtime behavior</td></tr>
+                <tr><td><strong>Best for</strong></td><td>Fast prototypes and simple agents</td><td>Custom frameworks, protocols, and complex systems</td></tr>
+              </tbody>
+            </table>
+          </section>
+
+          <section>
+            <h2>Agent Service lifecycle</h2>
+            <div class="value-grid">
+              <div><strong>Create</strong><span>configure a prompt agent or build code for a hosted agent</span></div>
+              <div><strong>Test</strong><span>use playgrounds, SDKs, REST APIs, and local loops</span></div>
+              <div><strong>Trace & evaluate</strong><span>inspect model calls, tool calls, and quality regressions</span></div>
+              <div><strong>Publish & monitor</strong><span>promote stable endpoints with metrics and dashboards</span></div>
+            </div>
+            <p class="source">Grounded in Microsoft Foundry Agent Service docs.</p>
+          </section>
+        </section>
+
+        <section>
+          <section class="section-title maf">
+            <p class="eyebrow">Part 2</p>
             <h2>Microsoft Agent Framework</h2>
             <p class="subtitle">One programming model for agents, no matter where the intelligence runs.</p>
           </section>
@@ -99,12 +144,11 @@ var advisor = chatClient.AsAIAgent(
               <p>How and where do I deploy them?</p>
             </div>
           </section>
-
         </section>
 
         <section>
           <section class="section-title aspire">
-            <p class="eyebrow">Part 2</p>
+            <p class="eyebrow">Part 3</p>
             <h2>Aspire</h2>
             <p class="subtitle">Code-first orchestration for the whole distributed app: local run, observability, and deployment.</p>
           </section>
@@ -160,6 +204,41 @@ builder.AddViteApp("frontend", "./frontend", "dev");
               </code></pre>
             </div>
             <p class="takeaway">Polyglot is not only “run many languages”; it is also “choose the language for the orchestration layer.”</p>
+          </section>
+
+          <section>
+            <h2>Foundry resources in the AppHost</h2>
+            <pre class="wide-code"><code class="language-csharp" data-trim>
+var foundry = builder.AddFoundry("aif-voice-ski-resort-demo");
+
+var project = foundry.AddProject("proj-voice-ski-resort-demo");
+
+var deployment = project.AddModelDeployment(
+    "gpt41",
+    FoundryModel.OpenAI.Gpt41)
+    .WithProperties(configure => configure.SkuCapacity = 150);
+
+var voiceDeployment = project.AddModelDeployment(
+    "gptrealtime",
+    FoundryModel.OpenAI.GptRealtime)
+    .WithProperties(configure => configure.SkuCapacity = 10);
+            </code></pre>
+            <p class="takeaway">The model layer is part of the same infrastructure code as the application services.</p>
+          </section>
+
+          <section>
+            <h2>Prompt agent in the AppHost</h2>
+            <pre class="wide-code"><code class="language-csharp" data-trim>
+var webSearch = project.AddWebSearchTool("web-search");
+
+var skiResearcher = project
+    .AddPromptAgent(
+        deployment,
+        name: "ski-researcher",
+        instructions: "Research and answer general ski questions.")
+    .WithTool(webSearch);
+            </code></pre>
+            <p class="source">Source: <code>src/apphost.cs</code></p>
           </section>
 
           <section>
@@ -227,85 +306,6 @@ advisorAgent.PublishAsHostedAgent(project);
             </code></pre>
             <p class="takeaway">Specialist services deploy to Azure Container Apps; the advisor is published as a Foundry hosted agent.</p>
           </section>
-        </section>
-
-        <section>
-          <section class="section-title foundry">
-            <p class="eyebrow">Part 3</p>
-            <h2>Microsoft Foundry</h2>
-            <p class="subtitle">Model hosting, prompt agents, hosted agents, and common tools become deployable resources in the app graph.</p>
-          </section>
-
-          <section>
-            <h2>Foundry in the AppHost</h2>
-            <pre class="wide-code"><code class="language-csharp" data-trim>
-var foundry = builder.AddFoundry("aif-voice-ski-resort-demo");
-
-var project = foundry.AddProject("proj-voice-ski-resort-demo");
-
-var deployment = project.AddModelDeployment(
-    "gpt41",
-    FoundryModel.OpenAI.Gpt41)
-    .WithProperties(configure => configure.SkuCapacity = 150);
-
-var voiceDeployment = project.AddModelDeployment(
-    "gptrealtime",
-    FoundryModel.OpenAI.GptRealtime)
-    .WithProperties(configure => configure.SkuCapacity = 10);
-            </code></pre>
-            <p class="takeaway">The model layer is part of the same infrastructure code as the application services.</p>
-          </section>
-
-          <section>
-            <h2>Prompt agents: fast to define, easy to tool</h2>
-            <pre class="wide-code"><code class="language-csharp" data-trim>
-var webSearch = project.AddWebSearchTool("web-search");
-
-var skiResearcher = project
-    .AddPromptAgent(
-        deployment,
-        name: "ski-researcher",
-        instructions: "Research and answer general ski questions.")
-    .WithTool(webSearch);
-            </code></pre>
-            <p class="source">Source: <code>src/apphost.cs</code></p>
-          </section>
-
-          <section>
-            <h2>Hosted agents: expose the orchestrator as a managed endpoint</h2>
-            <pre class="wide-code"><code class="language-csharp" data-trim>
-var agent = chatClient.AsAIAgent(
-    name: "advisor-agent",
-    instructions: "Route each question to the right specialist.",
-    tools: [
-        weatherAgent.AsAIFunction(),
-        liftAgent.AsAIFunction(),
-        skiResearcherAgent.AsAIFunction()
-    ]);
-
-builder.Services.AddFoundryResponses(agent);
-
-app.MapFoundryResponses();
-            </code></pre>
-            <p class="takeaway">The advisor is a normal MAF agent first; Foundry Responses exposes it through a hosted-compatible HTTP shape.</p>
-          </section>
-
-          <section>
-            <h2>Hosted and prompt agents become tools too</h2>
-            <pre class="wide-code"><code class="language-csharp" data-trim>
-var foundryProjectClient = new AIProjectClient(projectUri, credential);
-
-var skiResearcherAgent = foundryProjectClient.ProjectOpenAIClient
-    .GetProjectResponsesClientForAgent(
-        new AgentReference(name: "ski-researcher"))
-    .AsIChatClient("gpt41")
-    .AsAIAgent(
-        name: "ski-researcher",
-        description: "Web-backed research for generic skiing questions.");
-            </code></pre>
-            <p class="source">Source: <code>src/advisor-agent-dotnet/Program.cs</code></p>
-          </section>
-
         </section>
 
         <section>
@@ -428,6 +428,25 @@ var advisor = chatClient.AsAIAgent(
           </section>
 
           <section>
+            <h2>Hosted advisor endpoint</h2>
+            <pre class="wide-code"><code class="language-csharp" data-trim>
+var agent = chatClient.AsAIAgent(
+    name: "advisor-agent",
+    instructions: "Route each question to the right specialist.",
+    tools: [
+        weatherAgent.AsAIFunction(),
+        liftAgent.AsAIFunction(),
+        skiResearcherAgent.AsAIFunction()
+    ]);
+
+builder.Services.AddFoundryResponses(agent);
+
+app.MapFoundryResponses();
+            </code></pre>
+            <p class="takeaway">The advisor is a normal MAF agent first; Foundry Responses exposes it through a hosted-compatible HTTP shape.</p>
+          </section>
+
+          <section>
             <h2>Voice advisor</h2>
             <div class="split">
               <div>
@@ -469,6 +488,8 @@ foreach (var tool in functionTools)
               </code></pre>
             </div>
             <p class="source">Source: <code>src/voice-advisor-agent/Program.cs</code>, <code>VoiceWebSocketHandler.cs</code></p>
+          </section>
+
           </section>
         </section>
 
