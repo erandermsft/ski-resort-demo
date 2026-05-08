@@ -419,10 +419,10 @@ User:
 ```
 /alpine-ai
   /advisor-agent-dotnet
-  /lift-traffic-agent-dotnet
-  /weather-agent-python
-  /safety-agent-python
-  /ski-coach-agent-python
+  /lifttrafficagent-dotnet
+  /weatheragent-python
+  /safetyagent-python
+  /skicoachagent-python
   /data-generator
   /frontend
   /infrastructure

@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 class SafetyAgentExecutor(AgentExecutor):
 
     def __init__(self):
-        self.agent = FoundryChatClient(project_endpoint=os.getenv("GPT41_URI"), credential=AzureCliCredential(), model="gpt41",).as_agent(
-            name="safety-agent",
+        self.agent = FoundryChatClient(project_endpoint=os.getenv("gpt41_URI"), credential=AzureCliCredential(), model="gpt41",).as_agent(
+            name="safetyagent",
             instructions="""You are the Safety Agent for AlpineAI ski resort. Your role is to evaluate risk across slopes using weather, avalanche, and visibility data. 
 
 Safety is your top priority. Always err on the side of caution.

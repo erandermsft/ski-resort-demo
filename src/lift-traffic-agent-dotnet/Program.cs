@@ -30,7 +30,7 @@ builder.Services.AddSingleton<LiftDataService>();
 builder.Services.AddSingleton<LiftTrafficTools>();
 
 // Register the agent
-var liftAgentBuilder = builder.AddAIAgent("lift-traffic-agent", (sp, key) =>
+var liftAgentBuilder = builder.AddAIAgent("lifttrafficagent", (sp, key) =>
 {
     var chatClient = sp.GetRequiredService<IChatClient>();
     var tools = sp.GetRequiredService<LiftTrafficTools>().GetFunctions();
@@ -65,7 +65,7 @@ var agentBaseUrl = app.Configuration["ASPNETCORE_URLS"]?.Split(';')[0] ?? "http:
 var agentUrl = $"{agentBaseUrl}/agenta2a";
 var agentCard = new AgentCard
 {
-    Name = "lift-traffic-agent",
+    Name = "lifttrafficagent",
     Description = "Lift congestion and traffic intelligence agent",
     Url = agentUrl,
     Version = "1.0",

@@ -46,8 +46,8 @@ var endpoint = ParseVoiceLiveEndpoint(builder.Configuration.GetConnectionString(
 var model = builder.Configuration["VoiceLive:Model"] ?? "gpt-realtime";
 var voice = builder.Configuration["VoiceLive:Voice"] ?? "en-US-Ava:DragonHDLatestNeural";
 
-var projectConnectionString = Environment.GetEnvironmentVariable("ConnectionStrings__proj-voice-ski-resort-demo")
-    ?? throw new InvalidOperationException("ConnectionStrings__proj-voice-ski-resort-demo is not set.");
+var projectConnectionString = Environment.GetEnvironmentVariable("ConnectionStrings__projvoiceskiresort")
+    ?? throw new InvalidOperationException("ConnectionStrings__projvoiceskiresort is not set.");
 var chatConnectionString = Environment.GetEnvironmentVariable("ConnectionStrings__gpt41")
     ?? throw new InvalidOperationException("ConnectionStrings__gpt41 is not set.");
 
@@ -59,7 +59,7 @@ var deploymentName = GetRequiredConnectionValue(chatConnectionBuilder, "Deployme
 
 if (!Uri.TryCreate(projectEndpoint, UriKind.Absolute, out var projectUri) || projectUri is null)
 {
-    throw new InvalidOperationException("ConnectionStrings__proj-voice-ski-resort-demo contains an invalid Endpoint value.");
+    throw new InvalidOperationException("ConnectionStrings__projvoiceskiresort contains an invalid Endpoint value.");
 }
 
 // Connect to downstream agents via A2A
@@ -67,10 +67,10 @@ var agents = new Dictionary<string, AIAgent>();
 
 var agentConfigs = new Dictionary<string, (string EnvVar, string CardPath)>
 {
-    ["weather_agent"] = ("services__weather-agent__https__0", "/.well-known/agent-card.json"),
-    ["lift_traffic_agent"] = ("services__lift-traffic-agent__https__0", "/agenta2a/.well-known/agent-card.json"),
-    ["safety_agent"] = ("services__safety-agent__https__0", "/.well-known/agent-card.json"),
-    ["ski_coach_agent"] = ("services__ski-coach-agent__https__0", "/.well-known/agent-card.json"),
+    ["weather_agent"] = ("services__weatheragent__https__0", "/.well-known/agent-card.json"),
+    ["lift_traffic_agent"] = ("services__lifttrafficagent__https__0", "/agenta2a/.well-known/agent-card.json"),
+    ["safety_agent"] = ("services__safetyagent__https__0", "/.well-known/agent-card.json"),
+    ["ski_coach_agent"] = ("services__skicoachagent__https__0", "/.well-known/agent-card.json"),
 };
 
 foreach (var (agentName, config) in agentConfigs)
@@ -100,8 +100,8 @@ foreach (var (agentName, config) in agentConfigs)
     }
 }
 
-var skiResearcherAgentName = Environment.GetEnvironmentVariable("SKI_RESEARCHER_AGENTNAME")
-    ?? throw new InvalidOperationException("SKI_RESEARCHER_AGENTNAME is not set.");
+var skiResearcherAgentName = Environment.GetEnvironmentVariable("SKIRESEARCHER_AGENTNAME")
+    ?? throw new InvalidOperationException("SKIRESEARCHER_AGENTNAME is not set.");
 var foundryProjectClient = new AIProjectClient(projectUri, new DefaultAzureCredential());
 var skiResearcherAgentReference = new AgentReference(name: skiResearcherAgentName);
 var responseClient = foundryProjectClient.ProjectOpenAIClient.GetProjectResponsesClientForAgent(skiResearcherAgentReference);
