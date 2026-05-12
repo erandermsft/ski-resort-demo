@@ -9,17 +9,17 @@ export default defineConfig({
     host: true,
     proxy: {
       '/api': {
-        target: process.env.DATA_GENERATOR_HTTPS || process.env.DATA_GENERATOR_HTTP,
+        target: process.env.DATAGENERATOR_HTTPS || process.env.DATAGENERATOR_HTTP,
         changeOrigin: true,
         secure: false,
       },
       '/responses': {
-        target: process.env.ADVISOR_AGENT_HTTPS || process.env.ADVISOR_AGENT_HTTP,
+        target: process.env.ADVISORAGENT_HTTPS || process.env.ADVISORAGENT_HTTP,
         changeOrigin: true,
         secure: false,
       },
       '/ws/voice': {
-        target: process.env.VOICE_ADVISOR_AGENT_HTTPS || process.env.VOICE_ADVISOR_AGENT_HTTP,
+        target: process.env.VOICEADVISORAGENT_HTTPS || process.env.VOICEADVISORAGENT_HTTP,
         changeOrigin: true,
         secure: false,
         ws: true,

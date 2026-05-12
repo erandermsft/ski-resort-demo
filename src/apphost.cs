@@ -1,9 +1,9 @@
-#:sdk Aspire.AppHost.Sdk@13.4.0-pr.16846.g266a6c80
-#:package Aspire.Hosting.Azure.AppContainers@13.4.0-pr.16846.g266a6c80
-#:package Aspire.Hosting.Foundry@13.4.0-pr.16846.g266a6c80
-#:package Aspire.Hosting.Azure.CosmosDB@13.4.0-pr.16846.g266a6c80
-#:package Aspire.Hosting.Python@13.4.0-pr.16846.g266a6c80
-#:package Aspire.Hosting.JavaScript@13.4.0-pr.16846.g266a6c80
+#:sdk Aspire.AppHost.Sdk@13.4.0-preview.1.26262.1
+#:package Aspire.Hosting.Azure.AppContainers@13.4.0-preview.1.26262.1
+#:package Aspire.Hosting.Foundry@13.4.0-preview.1.26262.1
+#:package Aspire.Hosting.Azure.CosmosDB@13.4.0-preview.1.26262.1
+#:package Aspire.Hosting.Python@13.4.0-preview.1.26262.1
+#:package Aspire.Hosting.JavaScript@13.4.0-preview.1.26262.1
 
 #:project ./advisor-agent-dotnet/AdvisorAgent.Dotnet.csproj
 #:project ./lift-traffic-agent-dotnet/LiftTrafficAgent.Dotnet.csproj
