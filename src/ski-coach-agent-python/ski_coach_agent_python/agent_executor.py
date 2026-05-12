@@ -21,7 +21,7 @@ class SkiCoachAgentExecutor(AgentExecutor):
 
     def __init__(self):
         self.agent = FoundryChatClient(project_endpoint=os.getenv("GPT41_URI"), credential=AzureCliCredential(), model="gpt41").as_agent(
-            name="ski-coach-agent",
+            name="skicoachagent",
             instructions="""You are the Ski Coach Agent for AlpineAI ski resort. You help skiers find the best slopes based on their skill level, preferences, and current conditions.
 
 When users ask for recommendations, always ask about their skill level if not provided (beginner, intermediate, advanced, expert).

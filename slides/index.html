@@ -169,14 +169,14 @@ var advisor = chatClient.AsAIAgent(
 var builder = DistributedApplication.CreateBuilder(args);
 
 var project = builder.AddFoundry("aif-voice-ski-resort-demo")
-    .AddProject("proj-voice-ski-resort-demo");
+    .AddProject("projvoiceskiresort");
 
 var deployment = project.AddModelDeployment(
-    "gpt41", FoundryModel.OpenAI.Gpt41);
+    "gpt41", FoundryModel.OpenAI.gpt41);
 
 var weatherAgent = builder.AddUvicornApp(
-    "weather-agent",
-    "./weather-agent-python",
+    "weatheragent",
+    "./weatheragent-python",
     "weather_agent_python.main:app");
               </code></pre>
             </div>
@@ -193,12 +193,12 @@ var weatherAgent = builder.AddUvicornApp(
               </div>
               <pre><code class="language-csharp" data-trim>
 var weatherAgent = builder.AddUvicornApp(
-    "weather-agent",
-    "./weather-agent-python",
+    "weatheragent",
+    "./weatheragent-python",
     "weather_agent_python.main:app");
 
 var liftAgent = builder.AddProject&lt;Projects.LiftTrafficAgent_Dotnet&gt;(
-    "lift-traffic-agent");
+    "lifttrafficagent");
 
 builder.AddViteApp("frontend", "./frontend", "dev");
               </code></pre>
@@ -211,11 +211,11 @@ builder.AddViteApp("frontend", "./frontend", "dev");
             <pre class="wide-code"><code class="language-csharp" data-trim>
 var foundry = builder.AddFoundry("aif-voice-ski-resort-demo");
 
-var project = foundry.AddProject("proj-voice-ski-resort-demo");
+var project = foundry.AddProject("projvoiceskiresort");
 
 var deployment = project.AddModelDeployment(
     "gpt41",
-    FoundryModel.OpenAI.Gpt41)
+    FoundryModel.OpenAI.gpt41)
     .WithProperties(configure => configure.SkuCapacity = 150);
 
 var voiceDeployment = project.AddModelDeployment(
@@ -245,8 +245,8 @@ var skiResearcher = project
             <h2>Dependencies are explicit</h2>
             <pre class="wide-code"><code class="language-csharp" data-trim>
 var weatherAgent = builder.AddUvicornApp(
-    "weather-agent",
-    "./weather-agent-python",
+    "weatheragent",
+    "./weatheragent-python",
     "weather_agent_python.main:app")
     .WithUv()
     .WithExternalHttpEndpoints()
@@ -290,8 +290,8 @@ var voiceAdvisorAgent = builder
 var aca = builder.AddAzureContainerAppEnvironment("aca");
 
 var weatherAgent = builder.AddUvicornApp(
-    "weather-agent",
-    "./weather-agent-python",
+    "weatheragent",
+    "./weatheragent-python",
     "weather_agent_python.main:app")
     .WithReference(deployment).WaitFor(deployment)
     .WithReference(dataGenerator).WaitFor(dataGenerator)
@@ -375,14 +375,14 @@ client = FoundryChatClient(
     model="gpt41")
 
 self.agent = client.as_agent(
-    name="weather-agent",
+    name="weatheragent",
     instructions="Provide weather, forecast, and storm guidance.",
     tools=[get_current_conditions, get_forecast, is_storm_incoming],
 )
               </code></pre>
               <pre><code class="language-csharp" data-trim>
 var agent = chatClient.AsAIAgent(
-    name: "lift-traffic-agent",
+    name: "lifttrafficagent",
     instructions: "Provide lift status, wait times, and congestion analysis.",
     tools: tools.ToArray());
 
@@ -405,7 +405,7 @@ AIAgent ResolveA2AAgent(string envVar, string cardPath = "/.well-known/agent-car
     return resolver.GetAgentCardAsync().Result.AsAIAgent(httpClient);
 }
 
-var weatherAgent = ResolveA2AAgent("services__weather-agent__https__0");
+var weatherAgent = ResolveA2AAgent("services__weatheragent__https__0");
 // ...
 
 var skiResearcherAgent = foundryProjectClient.ProjectOpenAIClient

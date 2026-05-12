@@ -11,8 +11,8 @@
     <PackageReference Include="Microsoft.Agents.AI.Abstractions" Version="1.2.0" />
     <PackageReference Include="Azure.AI.Projects" Version="2.1.0-beta.1" />
     <PackageReference Include="Microsoft.Agents.AI.Foundry.Hosting" Version="1.2.0-preview.260421.1" />
-    <PackageReference Include="Aspire.Azure.AI.Inference" Version="13.4.0-preview.1.26229.15" />
-    <PackageReference Include="Aspire.Microsoft.Azure.Cosmos" Version="13.4.0-preview.1.26229.15" />
+    <PackageReference Include="Aspire.Azure.AI.Inference" Version="13.4.0-preview.1.26262.1" />
+    <PackageReference Include="Aspire.Microsoft.Azure.Cosmos" Version="13.4.0-preview.1.26262.1" />
     <PackageReference Include="Microsoft.Agents.AI.Foundry.Hosting" VersionOverride="1.2.0-preview.260421.1" />
   </ItemGroup>
   <ItemGroup>

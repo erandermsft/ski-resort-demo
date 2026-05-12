@@ -118,10 +118,10 @@ src/
 ├── apphost.settings.Development.json  # Azure configuration
 ├── advisor-agent-dotnet/           # .NET hosted Responses advisor agent
 ├── voice-advisor-agent/            # .NET Voice Live WebSocket advisor
-├── lift-traffic-agent-dotnet/      # .NET lift traffic agent (A2A)
-├── weather-agent-python/           # Python weather agent (A2A)
-├── safety-agent-python/            # Python safety agent (A2A)
-├── ski-coach-agent-python/         # Python ski coach agent (A2A)
+├── lifttrafficagent-dotnet/      # .NET lift traffic agent (A2A)
+├── weatheragent-python/           # Python weather agent (A2A)
+├── safetyagent-python/            # Python safety agent (A2A)
+├── skicoachagent-python/         # Python ski coach agent (A2A)
 ├── data-generator/                 # Python FastAPI data generator
 ├── frontend/                       # Vite + React + Tailwind dashboard
 ├── shared-services/                # .NET shared library (Cosmos, thread store)

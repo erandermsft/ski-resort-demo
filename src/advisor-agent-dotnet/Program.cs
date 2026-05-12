@@ -11,8 +11,8 @@ using Azure.AI.Extensions.OpenAI;
 
 string port = Environment.GetEnvironmentVariable("DEFAULT_AD_PORT") ?? "8088";
 
-var projectConnectionString = Environment.GetEnvironmentVariable("ConnectionStrings__proj-voice-ski-resort-demo")
-    ?? throw new InvalidOperationException("ConnectionStrings__proj-voice-ski-resort-demo is not set.");
+var projectConnectionString = Environment.GetEnvironmentVariable("ConnectionStrings__projvoiceskiresort")
+    ?? throw new InvalidOperationException("ConnectionStrings__projvoiceskiresort is not set.");
 var chatConnectionString = Environment.GetEnvironmentVariable("ConnectionStrings__gpt41")
     ?? throw new InvalidOperationException("ConnectionStrings__gpt41 is not set.");
 
@@ -24,7 +24,7 @@ var deploymentName = GetRequiredConnectionValue(chatConnectionBuilder, "Deployme
 
 if (!Uri.TryCreate(projectEndpoint, UriKind.Absolute, out var projectUri) || projectUri is null)
 {
-    throw new InvalidOperationException("ConnectionStrings__proj-voice-ski-resort-demo contains an invalid Endpoint value.");
+    throw new InvalidOperationException("ConnectionStrings__projvoiceskiresort contains an invalid Endpoint value.");
 }
 
 var credential = new DefaultAzureCredential();
@@ -51,19 +51,25 @@ static string AppendPath(string url, string path)
     => $"{url.TrimEnd('/')}/{path.TrimStart('/')}";
 
 // Connect to specialist agents via A2A
-var weatherAgent = ResolveA2AAgent("services__weather-agent__https__0");
-var liftAgent = ResolveA2AAgent(Environment.GetEnvironmentVariable("services__lift-traffic-agent__https__0") != null
-        ? "services__lift-traffic-agent__https__0"
-        : "services__lift-traffic-agent__http__0",
+var weatherAgent = ResolveA2AAgent(Environment.GetEnvironmentVariable("services__weatheragent__https__0") != null 
+    ? "services__weatheragent__https__0" 
+    : "services__weatheragent__http__0");
+var liftAgent = ResolveA2AAgent(Environment.GetEnvironmentVariable("services__lifttrafficagent__https__0") != null
+        ? "services__lifttrafficagent__https__0"
+        : "services__lifttrafficagent__http__0",
     "/agenta2a/v1/card");
-var safetyAgent = ResolveA2AAgent("services__safety-agent__https__0");
-var coachAgent = ResolveA2AAgent("services__ski-coach-agent__https__0");
+var safetyAgent = ResolveA2AAgent(Environment.GetEnvironmentVariable("services__safetyagent__https__0") != null
+        ? "services__safetyagent__https__0"
+        : "services__safetyagent__http__0");
+var coachAgent = ResolveA2AAgent(Environment.GetEnvironmentVariable("services__skicoachagent__https__0") != null
+        ? "services__skicoachagent__https__0"
+        : "services__skicoachagent__http__0");
 var foundryProjectClient = new AIProjectClient(projectUri, credential);
 
 // var skiResearcherAgent = await foundryProjectClient.AgentAdministrationClient.GetAgentAsync("ski-researcher");
-var skiResearcherAgentReference = new AgentReference(name: Environment.GetEnvironmentVariable("SKI_RESEARCHER_AGENTNAME"));
+var skiResearcherAgentReference = new AgentReference(name: Environment.GetEnvironmentVariable("SKIRESEARCHER_AGENTNAME"));
 var responseClient = foundryProjectClient.ProjectOpenAIClient.GetProjectResponsesClientForAgent(skiResearcherAgentReference);
-var skiResearcherAgent = responseClient.AsIChatClient("gpt41").AsAIAgent(Environment.GetEnvironmentVariable("SKI_RESEARCHER_AGENTNAME"), description: "I can search the web. Use me for any generic question about skiing.");
+var skiResearcherAgent = responseClient.AsIChatClient("gpt41").AsAIAgent(Environment.GetEnvironmentVariable("SKIRESEARCHER_AGENTNAME"), description: "I can search the web. Use me for any generic question about skiing.");
 
 var agent = new AIProjectClient(new Uri(projectEndpoint), new DefaultAzureCredential())
     .GetProjectOpenAIClient()

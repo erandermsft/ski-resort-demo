@@ -4,7 +4,7 @@ namespace LiftTrafficAgent.Dotnet.Services;
 
 public class LiftDataService
 {
-    private const string DataGeneratorUrl = "https+http://data-generator";
+    private const string DataGeneratorUrl = "https+http://datagenerator";
 
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<LiftDataService> _logger;

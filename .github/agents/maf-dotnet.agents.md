@@ -9,7 +9,7 @@ You are an expert in Microsoft Agent Framework (MAF), .NET 10, Aspire, A2A, and 
 
 Before coding, choose one primary exposure pattern.
 
-- **A2A specialist agent**: use for weather/lift/safety/coach-style specialists that other agents call as tools. Reference: `src/lift-traffic-agent-dotnet/Program.cs`.
+- **A2A specialist agent**: use for weather/lift/safety/coach-style specialists that other agents call as tools. Reference: `src/lifttrafficagent-dotnet/Program.cs`.
 - **Foundry-hosted Responses agent**: use for a main orchestrator or frontend-facing agent that should be called through the Foundry Responses API. Reference: `src/advisor-agent-dotnet/Program.cs`.
 - **Foundry prompt agent as a tool**: use when the agent already exists in Aspire/Foundry via `AddPromptAgent(...)` and this .NET agent should call it as a tool. Reference: `ski_researcher_agent` wiring in `advisor-agent-dotnet` and `voice-advisor-agent`.
 
@@ -197,8 +197,8 @@ using Azure.AI.Projects;
 using Azure.AI.Projects.Agents;
 using System.Data.Common;
 
-var projectConnectionString = Environment.GetEnvironmentVariable("ConnectionStrings__proj-voice-ski-resort-demo")
-    ?? throw new InvalidOperationException("ConnectionStrings__proj-voice-ski-resort-demo is not set.");
+var projectConnectionString = Environment.GetEnvironmentVariable("ConnectionStrings__projvoiceskiresort")
+    ?? throw new InvalidOperationException("ConnectionStrings__projvoiceskiresort is not set.");
 var chatConnectionString = Environment.GetEnvironmentVariable("ConnectionStrings__gpt41")
     ?? throw new InvalidOperationException("ConnectionStrings__gpt41 is not set.");
 

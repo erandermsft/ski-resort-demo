@@ -64,7 +64,7 @@ def get_agent_card(host: str, port: int) -> AgentCard:
         AgentCard: The agent card describing capabilities and skills
     """
     return AgentCard(
-        name="safety-agent",
+        name="safetyagent",
         description="Risk evaluation and slope safety agent for AlpineAI ski resort",
         url=f"https://localhost:{port}/",
         version="1.0.0",
@@ -136,7 +136,7 @@ def create_app():
 
     @app_instance.get("/health")
     async def health():
-        return {"status": "healthy", "service": "safety-agent"}
+        return {"status": "healthy", "service": "safetyagent"}
 
     otel_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
     if otel_endpoint:

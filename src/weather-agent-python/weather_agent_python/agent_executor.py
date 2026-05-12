@@ -21,7 +21,7 @@ class WeatherAgentExecutor(AgentExecutor):
 
     def __init__(self):
         self.agent = FoundryChatClient(project_endpoint=os.getenv("GPT41_URI"), credential=AzureCliCredential(), model="gpt41").as_agent(
-            name="weather-agent",
+            name="weatheragent",
             instructions="""You are the Weather Intelligence Agent for AlpineAI ski resort. 
 Your role is to help skiers, staff, and resort operators understand current weather conditions, 
 upcoming forecasts, and potential storm threats.

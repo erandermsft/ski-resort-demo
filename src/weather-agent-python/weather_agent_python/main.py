@@ -55,7 +55,7 @@ def _configure_from_aspire_connection_string():
 def get_agent_card(host: str, port: int) -> AgentCard:
     """Create and return the AgentCard for the weather agent."""
     return AgentCard(
-        name="weather-agent",
+        name="weatheragent",
         description="Weather intelligence agent providing real-time conditions, forecasts, and storm alerts for the ski resort",
         url=f"https://localhost:{port}/",
         version="1.0.0",
@@ -128,7 +128,7 @@ def create_app():
 
     @app_instance.get("/health")
     async def health():
-        return {"status": "healthy", "service": "weather-agent"}
+        return {"status": "healthy", "service": "weatheragent"}
 
     otel_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
     if otel_endpoint:
