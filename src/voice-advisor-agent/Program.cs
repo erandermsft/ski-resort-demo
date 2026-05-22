@@ -67,10 +67,10 @@ var agents = new Dictionary<string, AIAgent>();
 
 var agentConfigs = new Dictionary<string, (string EnvVar, string CardPath)>
 {
-    ["weather_agent"] = ("services__weatheragent__https__0", "/.well-known/agent-card.json"),
-    ["lift_traffic_agent"] = ("services__lifttrafficagent__https__0", "/agenta2a/.well-known/agent-card.json"),
-    ["safety_agent"] = ("services__safetyagent__https__0", "/.well-known/agent-card.json"),
-    ["ski_coach_agent"] = ("services__skicoachagent__https__0", "/.well-known/agent-card.json"),
+    ["weatheragent"] = ("services__weatheragent__https__0", "/.well-known/agent-card.json"),
+    ["lifttrafficagent"] = ("services__lifttrafficagent__https__0", "/.well-known/agent-card.json"),
+    ["safetyagent"] = ("services__safetyagent__https__0", "/.well-known/agent-card.json"),
+    ["skicoachagent"] = ("services__skicoachagent__https__0", "/.well-known/agent-card.json"),
 };
 
 foreach (var (agentName, config) in agentConfigs)
@@ -87,9 +87,7 @@ foreach (var (agentName, config) in agentConfigs)
         };
 
         // Python agents use well-known path, .NET agents use /agenta2a/v1/card
-        var cardPath = agentName == "lift_traffic_agent"
-            ? "/agenta2a/v1/card"
-            : "/.well-known/agent-card.json";
+        var cardPath = "/.well-known/agent-card.json";
 
         var cardResolver = new A2ACardResolver(
             httpClient.BaseAddress!,

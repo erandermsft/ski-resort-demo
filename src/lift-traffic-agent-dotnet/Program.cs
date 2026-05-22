@@ -43,7 +43,7 @@ var liftAgentBuilder = builder.AddAIAgent("lifttrafficagent", (sp, key) =>
     );
 
     return agent;
-});
+}).AddA2AServer();
 
 // Configure CORS for frontend access
 builder.Services.AddCors(options =>
@@ -63,18 +63,17 @@ app.UseCors();
 
 var agentBaseUrl = app.Configuration["ASPNETCORE_URLS"]?.Split(';')[0] ?? "http://localhost:5196";
 var agentUrl = $"{agentBaseUrl}/agenta2a";
-var agentCard = new AgentCard
+var hostA2AAgentCard = new AgentCard
 {
     Name = "lifttrafficagent",
     Description = "Lift congestion and traffic intelligence agent",
-    Url = agentUrl,
-    Version = "1.0",
-    PreferredTransport = AgentTransport.JsonRpc,
-    AdditionalInterfaces = [
+    Version = "1.0.0",
+    SupportedInterfaces = [
         new AgentInterface
         {
             Url = agentUrl,
-            Transport = AgentTransport.JsonRpc
+            ProtocolBinding = "HTTP+JSON",
+            ProtocolVersion = "1.0"
         }
     ],
     DefaultInputModes = ["text"],
@@ -87,6 +86,7 @@ var agentCard = new AgentCard
     Skills = [
         new A2A.AgentSkill
         {
+            Id = "lift-traffic-analysis",
             Name = "Lift Traffic Analysis",
             Description = "Real-time lift status, wait times, and congestion analysis",
             Examples = [
@@ -94,13 +94,16 @@ var agentCard = new AgentCard
                 "Show me all lift wait times",
                 "Which area of the resort is least crowded?",
                 "Where should I ski to avoid long lines?"
-            ]
+            ],
+            Tags = ["lifts", "traffic", "wait-times", "congestion"]
         }
     ]
 };
 
+app.MapWellKnownAgentCard(hostA2AAgentCard);
+
 // Map A2A endpoint
-app.MapA2A(liftAgentBuilder, "/agenta2a", agentCard);
+app.MapA2AHttpJson(liftAgentBuilder, "/agenta2a");
 
 app.MapDefaultEndpoints();
 app.Run();

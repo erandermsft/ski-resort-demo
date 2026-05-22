@@ -3,13 +3,9 @@ Weather Agent Executor for A2A SDK.
 """
 import logging
 import os
-from typing_extensions import override
-
-from a2a.server.agent_execution import AgentExecutor, RequestContext
-from a2a.server.events import EventQueue
-from a2a.utils import new_agent_text_message
 
 from agent_framework.foundry import FoundryChatClient
+from agent_framework_a2a import A2AExecutor
 from azure.identity import AzureCliCredential
 
 from tools.weather_tools import get_current_conditions, get_forecast, is_storm_incoming
@@ -17,10 +13,10 @@ from tools.weather_tools import get_current_conditions, get_forecast, is_storm_i
 logger = logging.getLogger(__name__)
 
 
-class WeatherAgentExecutor(AgentExecutor):
+class WeatherAgentExecutor(A2AExecutor):
 
     def __init__(self):
-        self.agent = FoundryChatClient(project_endpoint=os.getenv("GPT41_URI"), credential=AzureCliCredential(), model="gpt41").as_agent(
+        agent = FoundryChatClient(project_endpoint=os.getenv("GPT41_URI"), credential=AzureCliCredential(), model="gpt41").as_agent(
             name="weatheragent",
             instructions="""You are the Weather Intelligence Agent for AlpineAI ski resort. 
 Your role is to help skiers, staff, and resort operators understand current weather conditions, 
@@ -30,20 +26,4 @@ When users ask questions, always provide specific numbers and actionable recomme
 Be concise but thorough. Safety is the top priority.""",
             tools=[get_current_conditions, get_forecast, is_storm_incoming],
         )
-
-    @override
-    async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
-        query = context.get_user_input()
-        if not context.message:
-            raise Exception('No message provided')
-
-        try:
-            response = await self.agent.run(query)
-            await event_queue.enqueue_event(new_agent_text_message(response.text))
-        except Exception as e:
-            logger.error(f"Error during execution: {e}", exc_info=True)
-            await event_queue.enqueue_event(new_agent_text_message(f"Error: {str(e)}"))
-
-    @override
-    async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
-        await event_queue.enqueue_event(new_agent_text_message("Weather query cancelled"))
+        super().__init__(agent, stream=True)

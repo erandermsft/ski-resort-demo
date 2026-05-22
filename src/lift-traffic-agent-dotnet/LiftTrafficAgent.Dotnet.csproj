@@ -5,11 +5,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Agents.AI" Version="1.2.0" />
-    <PackageReference Include="Microsoft.Agents.AI.Abstractions" Version="1.2.0" />
-    <PackageReference Include="Microsoft.Agents.AI.Hosting" Version="1.2.0-preview.260421.1" />
-    <PackageReference Include="Microsoft.Agents.AI.Hosting.A2A.AspNetCore" Version="1.2.0-preview.260421.1" />
-    <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.2.0" />
+    <PackageReference Include="Microsoft.Agents.AI" Version="1.6.2" />
+    <PackageReference Include="Microsoft.Agents.AI.Abstractions" Version="1.6.2" />
+    <PackageReference Include="Microsoft.Agents.AI.Hosting" Version="1.6.2-preview.260521.1" />
+    <PackageReference Include="Microsoft.Agents.AI.Hosting.A2A.AspNetCore" Version="1.6.2-preview.260521.1" />
+    <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.6.2" />
     <PackageReference Include="Aspire.Azure.AI.Inference" Version="13.4.0-preview.1.26262.1" />
   </ItemGroup>
   <ItemGroup>

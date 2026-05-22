@@ -3,13 +3,9 @@ Safety Agent Executor for A2A SDK.
 """
 import logging
 import os
-from typing_extensions import override
-
-from a2a.server.agent_execution import AgentExecutor, RequestContext
-from a2a.server.events import EventQueue
-from a2a.utils import new_agent_text_message
 
 from agent_framework.foundry import FoundryChatClient
+from agent_framework_a2a import A2AExecutor
 from azure.identity import AzureCliCredential
 
 from tools.safety_tools import evaluate_risk, is_slope_safe, get_closed_slopes
@@ -17,10 +13,10 @@ from tools.safety_tools import evaluate_risk, is_slope_safe, get_closed_slopes
 logger = logging.getLogger(__name__)
 
 
-class SafetyAgentExecutor(AgentExecutor):
+class SafetyAgentExecutor(A2AExecutor):
 
     def __init__(self):
-        self.agent = FoundryChatClient(project_endpoint=os.getenv("GPT41_URI"), credential=AzureCliCredential(), model="gpt41",).as_agent(
+        agent = FoundryChatClient(project_endpoint=os.getenv("GPT41_URI"), credential=AzureCliCredential(), model="gpt41",).as_agent(
             name="safetyagent",
             instructions="""You are the Safety Agent for AlpineAI ski resort. Your role is to evaluate risk across slopes using weather, avalanche, and visibility data. 
 
@@ -35,20 +31,4 @@ Risk levels:
 When in doubt, recommend caution.""",
             tools=[evaluate_risk, is_slope_safe, get_closed_slopes],
         )
-
-    @override
-    async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
-        query = context.get_user_input()
-        if not context.message:
-            raise Exception('No message provided')
-
-        try:
-            response = await self.agent.run(query)
-            await event_queue.enqueue_event(new_agent_text_message(response.text))
-        except Exception as e:
-            logger.error(f"Error during execution: {e}", exc_info=True)
-            await event_queue.enqueue_event(new_agent_text_message(f"Error: {str(e)}"))
-
-    @override
-    async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
-        await event_queue.enqueue_event(new_agent_text_message("Safety assessment cancelled"))
+        super().__init__(agent, stream=True)

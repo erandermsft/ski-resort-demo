@@ -83,8 +83,8 @@ class CoachService:
     def __init__(self):
         """Initialize the coach service."""
         self.data_generator_url = (
-            os.environ.get("services__data-generator__https__0")
-            or os.environ.get("services__data-generator__http__0")
+            os.environ.get("services__datagenerator__https__0")
+            or os.environ.get("services__datagenerator__http__0")
             or "http://localhost:8080"
         )
         logger.info(f"CoachService initialized with data generator at: {self.data_generator_url}")

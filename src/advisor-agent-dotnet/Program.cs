@@ -2,12 +2,16 @@ using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Foundry.Hosting;
 using Microsoft.Extensions.AI;
 using Azure.AI.Projects;
+using Azure.AI.AgentServer.Responses;
 using Azure.Identity;
 using System.Data.Common;
 using A2A;
 using Azure.AI.Extensions.OpenAI;
+using CreateResponse = Azure.AI.AgentServer.Responses.Models.CreateResponse;
 
 #pragma warning disable OPENAI001
+
+const string AgentResponseIdHeader = "x-agent-response-id";
 
 string port = Environment.GetEnvironmentVariable("DEFAULT_AD_PORT") ?? "8088";
 
@@ -39,9 +43,8 @@ AIAgent ResolveA2AAgent(string envVar, string cardPath = "/.well-known/agent-car
     var agentCard = resolver.GetAgentCardAsync().Result;
     if (!string.IsNullOrWhiteSpace(endpointPath))
     {
-        agentCard.Url = AppendPath(agentCard.Url, endpointPath);
-        foreach (var additionalInterface in agentCard.AdditionalInterfaces)
-            additionalInterface.Url = AppendPath(additionalInterface.Url, endpointPath);
+        foreach (var supportedInterface in agentCard.SupportedInterfaces)
+            supportedInterface.Url = AppendPath(supportedInterface.Url, endpointPath);
     }
 
     return agentCard.AsAIAgent(httpClient);
@@ -56,8 +59,7 @@ var weatherAgent = ResolveA2AAgent(Environment.GetEnvironmentVariable("services_
     : "services__weatheragent__http__0");
 var liftAgent = ResolveA2AAgent(Environment.GetEnvironmentVariable("services__lifttrafficagent__https__0") != null
         ? "services__lifttrafficagent__https__0"
-        : "services__lifttrafficagent__http__0",
-    "/agenta2a/v1/card");
+        : "services__lifttrafficagent__http__0");
 var safetyAgent = ResolveA2AAgent(Environment.GetEnvironmentVariable("services__safetyagent__https__0") != null
         ? "services__safetyagent__https__0"
         : "services__safetyagent__http__0");
@@ -130,12 +132,19 @@ builder.Services.AddCors(options =>
     });
 });
 
-builder.Services.AddFoundryResponses(agent);
+builder.Services.AddFoundryResponses(agent, new FileSystemAgentSessionStore(GetCheckpointDirectory()));
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddSingleton<HostedSessionIsolationKeyProvider, LocalDevelopmentHostedSessionIsolationKeyProvider>();
+}
 
 var app = builder.Build();
 
 // Enable CORS
 app.UseCors();
+
+// Work around hosted storage conflicts caused by replayed platform response IDs.
+app.Use(UseSdkGeneratedResponseIdsForResponses);
 
 // Map Foundry Responses API endpoint at /responses.
 app.MapFoundryResponses();
@@ -159,4 +168,59 @@ static string GetRequiredConnectionValue(DbConnectionStringBuilder connectionBui
     }
 
     return value;
+}
+
+static string GetCheckpointDirectory()
+{
+    var homeDirectory = Environment.GetEnvironmentVariable("HOME");
+
+    return string.IsNullOrWhiteSpace(homeDirectory)
+        ? Path.Combine(Directory.GetCurrentDirectory(), FileSystemAgentSessionStore.LocalCheckpointDirectoryName)
+        : Path.Combine(homeDirectory, FileSystemAgentSessionStore.LocalCheckpointDirectoryName);
+}
+
+static async Task UseSdkGeneratedResponseIdsForResponses(HttpContext context, Func<Task> next)
+{
+    if (HttpMethods.IsPost(context.Request.Method)
+        && string.Equals(context.Request.Path.Value, "/responses", StringComparison.OrdinalIgnoreCase)
+        && context.Request.Headers.ContainsKey(AgentResponseIdHeader))
+    {
+        context.Request.Headers.Remove(AgentResponseIdHeader);
+    }
+
+    await next();
+}
+
+sealed class LocalDevelopmentHostedSessionIsolationKeyProvider : HostedSessionIsolationKeyProvider
+{
+    private const string UserIsolationKeyEnvironmentVariable = "HOSTED_USER_ISOLATION_KEY";
+    private const string ChatIsolationKeyEnvironmentVariable = "HOSTED_CHAT_ISOLATION_KEY";
+    private const string DefaultLocalUserIsolationKey = "local-dev-user";
+    private const string DefaultLocalChatIsolationKey = "local-dev-chat";
+
+    public override ValueTask<HostedSessionContext?> GetKeysAsync(
+        ResponseContext context,
+        CreateResponse request,
+        CancellationToken cancellationToken)
+    {
+        var userId = !string.IsNullOrWhiteSpace(context.Isolation?.UserIsolationKey)
+            ? context.Isolation.UserIsolationKey
+            : Environment.GetEnvironmentVariable(UserIsolationKeyEnvironmentVariable);
+
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            userId = DefaultLocalUserIsolationKey;
+        }
+
+        var chatId = !string.IsNullOrWhiteSpace(context.Isolation?.ChatIsolationKey)
+            ? context.Isolation.ChatIsolationKey
+            : Environment.GetEnvironmentVariable(ChatIsolationKeyEnvironmentVariable);
+
+        if (string.IsNullOrWhiteSpace(chatId))
+        {
+            chatId = DefaultLocalChatIsolationKey;
+        }
+
+        return ValueTask.FromResult<HostedSessionContext?>(new HostedSessionContext(userId, chatId));
+    }
 }

@@ -17,8 +17,8 @@ class SafetyService:
     def __init__(self):
         """Initialize the safety service with data-generator endpoint."""
         self.data_generator_url = (
-            os.getenv("services__data-generator__https__0")
-            or os.getenv("services__data-generator__http__0")
+            os.getenv("services__datagenerator__https__0")
+            or os.getenv("services__datagenerator__http__0")
         )
         if not self.data_generator_url:
             logger.warning("data-generator service endpoint environment variable not set, using default")

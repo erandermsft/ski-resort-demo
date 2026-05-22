@@ -6,17 +6,17 @@ import os
 import logging
 
 import uvicorn
+from fastapi import FastAPI
 
 # A2A SDK imports
-from a2a.server.apps import A2AFastAPIApplication
 from a2a.server.request_handlers import DefaultRequestHandler
+from a2a.server.routes import create_agent_card_routes, create_jsonrpc_routes
 from a2a.server.tasks import InMemoryTaskStore
 from a2a.types import (
     AgentCapabilities,
     AgentCard,
     AgentSkill,
     AgentInterface,
-    TransportProtocol
 )
 
 # OpenTelemetry imports
@@ -57,22 +57,20 @@ def get_agent_card(host: str, port: int) -> AgentCard:
     return AgentCard(
         name="weatheragent",
         description="Weather intelligence agent providing real-time conditions, forecasts, and storm alerts for the ski resort",
-        url=f"https://localhost:{port}/",
         version="1.0.0",
         default_input_modes=["text"],
         default_output_modes=["text"],
         supported_interfaces=[
             AgentInterface(
                 url=f"https://localhost:{port}/",
-                transport='HTTP+JSON',
-                protocol_version='1.0',
+                protocol_binding="JSONRPC",
+                protocol_version="1.0",
             )
         ],
         capabilities=AgentCapabilities(
             streaming=True,
             push_notifications=False
         ),
-        preferred_transport=TransportProtocol.http_json,
         skills=[
             AgentSkill(
                 id="weather-intelligence",
@@ -108,14 +106,15 @@ def create_app():
     http_handler = DefaultRequestHandler(
         agent_executor=agent_executor,
         task_store=task_store,
-    )
-
-    server = A2AFastAPIApplication(
         agent_card=agent_card,
-        http_handler=http_handler
     )
 
-    app_instance = server.build()
+    app_instance = FastAPI(
+        routes=[
+            *create_agent_card_routes(agent_card),
+            *create_jsonrpc_routes(http_handler, "/"),
+        ]
+    )
 
     from fastapi.middleware.cors import CORSMiddleware
     app_instance.add_middleware(
