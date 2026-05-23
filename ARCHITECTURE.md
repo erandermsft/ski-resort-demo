@@ -9,7 +9,7 @@ The system is built using:
 * **Microsoft Agent Framework (MAF)** as the agent orchestration layer
 * **Agent-to-Agent (A2A)** protocol to expose each agent
 * **[Aspire](https://aspire.dev)** as the local development orchestrator
-* Polyglot microservices (.NET + Python)
+* Polyglot microservices (.NET + Python + Go)
 * Real-time fake telemetry generator
 * Event-driven communication
 * A real-time frontend dashboard
@@ -33,7 +33,7 @@ All specialist agents are exposed via A2A and consumed as tools.
 | Lift Traffic Agent       | .NET                           | Lift congestion analysis          |
 | Safety Agent             | Python                         | Risk & slope safety validation    |
 | Ski Coach Agent          | Python                         | Skill-based slope recommendation  |
-| Real-Time Data Generator | Python                         | Fake telemetry + weather + events |
+| Real-Time Data Generator | Go                             | Fake telemetry + weather + events |
 | Event Bus                | Cloud-native (Dapr or similar) | Pub/Sub event backbone            |
 | Frontend Dashboard       | React / Next.js                | Visualization UI                  |
 | API Gateway              | .NET                           | Unified access point              |
@@ -233,7 +233,7 @@ Note: It may call other agents via A2A if needed.
 
 ---
 
-# 8. Real-Time Fake Data Generator (Python)
+# 8. Real-Time Fake Data Generator (Go)
 
 ## Purpose
 
@@ -261,8 +261,8 @@ Continuously emits synthetic but realistic data so system behaves as live.
 
 ## Implementation
 
-* Async Python service
-* Emits events every 1–3 seconds
+* Go HTTP service
+* Updates telemetry every 5–10 seconds
 * Publishes to Event Bus
 * Also exposes REST endpoint for latest state
 

@@ -20,7 +20,7 @@ An AI-powered ski resort concierge that coordinates weather intelligence, lift t
                ▼                      ▼
 ┌──────────────────────┐  ┌──────────────────────────┐  ┌──────────────────────────┐
 │   Data Generator     │  │   Advisor Agent (.NET)   │  │ Voice Advisor Agent (.NET)│
-│   (Python/FastAPI)   │  │ Foundry hosted Responses │  │ Voice Live WebSocket      │
+│       (Go)           │  │ Foundry hosted Responses │  │ Voice Live WebSocket      │
 └──────────┬───────────┘  └────────────┬─────────────┘  └────────────┬─────────────┘
            │                           │                             │
            │                  A2A + Foundry tools            A2A + Foundry tools
@@ -44,7 +44,7 @@ An AI-powered ski resort concierge that coordinates weather intelligence, lift t
 | **Safety Agent** | Python | Risk evaluation, slope safety, closures |
 | **Ski Coach Agent** | Python | Personalized slope recommendations, day plans |
 | **Ski Researcher Agent** | Azure AI Foundry prompt agent | Web-search-backed general skiing research and background information |
-| **Data Generator** | Python | Continuously generates synthetic resort telemetry |
+| **Data Generator** | Go | Continuously generates synthetic resort telemetry |
 | **Frontend** | React/Vite | Real-time dashboard with AI chat and voice controls |
 
 ## Prerequisites
@@ -52,6 +52,7 @@ An AI-powered ski resort concierge that coordinates weather intelligence, lift t
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
 - [Python 3.11+](https://www.python.org/downloads/)
 - [uv](https://docs.astral.sh/uv/) (Python package manager)
+- [Go 1.23+](https://go.dev/doc/install)
 - [Node.js 20+](https://nodejs.org/)
 - [.NET Aspire CLI](https://learn.microsoft.com/dotnet/aspire/fundamentals/setup-tooling)
 - An **Azure AI Foundry** resource with a `gpt-4.1` (or similar) deployment
@@ -102,7 +103,7 @@ This single command starts **all services**:
 - 3 .NET agents/services (advisor + lift traffic + voice advisor)
 - 3 Python agents (weather + safety + ski coach)
 - 1 Azure AI Foundry prompt agent (ski researcher with web search)
-- Data generator (Python/FastAPI)
+- Data generator (Go)
 - Frontend (Vite dev server)
 - Cosmos DB emulator
 
@@ -122,7 +123,7 @@ src/
 ├── weatheragent-python/           # Python weather agent (A2A)
 ├── safetyagent-python/            # Python safety agent (A2A)
 ├── skicoachagent-python/         # Python ski coach agent (A2A)
-├── data-generator/                 # Python FastAPI data generator
+├── data-generator/                 # Go data generator
 ├── frontend/                       # Vite + React + Tailwind dashboard
 ├── shared-services/                # .NET shared library (Cosmos, thread store)
 └── service-defaults/               # Aspire service defaults
@@ -132,7 +133,7 @@ src/
 
 ### Data Generator
 
-The data generation speed and drift magnitudes are configurable via `src/data-generator/data_generator/config.json`:
+The data generation speed and drift magnitudes are configurable via `src/data-generator/config.json`:
 
 ```json
 {

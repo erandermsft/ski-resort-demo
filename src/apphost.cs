@@ -4,6 +4,7 @@
 #:package Aspire.Hosting.Azure.CosmosDB@13.4.0-preview.1.26262.1
 #:package Aspire.Hosting.Python@13.4.0-preview.1.26262.1
 #:package Aspire.Hosting.JavaScript@13.4.0-preview.1.26262.1
+#:package CommunityToolkit.Aspire.Hosting.Golang@13.3.0
 
 #:project ./advisor-agent-dotnet/AdvisorAgent.Dotnet.csproj
 #:project ./lift-traffic-agent-dotnet/LiftTrafficAgent.Dotnet.csproj
@@ -58,10 +59,11 @@ var conversations = db.AddContainer("conversations", "/conversationId");
 var sessions = db.AddContainer("sessions", "/conversationId");
 
 // ---------------------------------------------------------------------------
-// Data Generator (Python)
+// Data Generator (Go)
 // ---------------------------------------------------------------------------
-var dataGenerator = builder.AddUvicornApp("datagenerator", "./data-generator", "data_generator.main:app")
-    .WithUv()
+var dataGenerator = builder.AddGolangApp("datagenerator", "./data-generator")
+    .WithGoModTidy()
+    .WithHttpEndpoint(env: "PORT")
     .WithExternalHttpEndpoints()
     .WithHttpHealthCheck("/health")
     .WithComputeEnvironment(aca);
