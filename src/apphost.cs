@@ -1,9 +1,9 @@
-#:sdk Aspire.AppHost.Sdk@13.4.0-preview.1.26262.1
-#:package Aspire.Hosting.Azure.AppContainers@13.4.0-preview.1.26262.1
-#:package Aspire.Hosting.Foundry@13.4.0-preview.1.26262.1
-#:package Aspire.Hosting.Azure.CosmosDB@13.4.0-preview.1.26262.1
-#:package Aspire.Hosting.Python@13.4.0-preview.1.26262.1
-#:package Aspire.Hosting.JavaScript@13.4.0-preview.1.26262.1
+#:sdk Aspire.AppHost.Sdk@13.4.0
+#:package Aspire.Hosting.Azure.AppContainers@13.4.0
+#:package Aspire.Hosting.Foundry@13.4.0-preview.1.26279.43
+#:package Aspire.Hosting.Azure.CosmosDB@13.4.0
+#:package Aspire.Hosting.Python@13.4.0
+#:package Aspire.Hosting.JavaScript@13.4.0
 #:package CommunityToolkit.Aspire.Hosting.Golang@13.3.0
 
 #:project ./advisor-agent-dotnet/AdvisorAgent.Dotnet.csproj
@@ -11,30 +11,13 @@
 #:project ./voice-advisor-agent/VoiceAdvisorAgent.csproj
 
 using Aspire.Hosting.Foundry;
-using Azure.Provisioning.Authorization;
-using Azure.Provisioning.CognitiveServices;
-using Azure.Provisioning.Expressions;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
 var aca = builder.AddAzureContainerAppEnvironment("aca");
 
-// var tenantId = builder.AddParameterFromConfiguration("tenant", "Azure:TenantId");
-
 var foundry = builder.AddFoundry("aifskiresort");
-var project = foundry.AddProject("projvoiceskiresort")
-    // workaround for https://github.com/microsoft/aspire/issues/15971
-    .ConfigureInfrastructure(infra =>
-    {
-        var project = infra.GetProvisionableResources().OfType<CognitiveServicesProject>().Single();
-
-        var foundryAccount = foundry.Resource.AddAsExistingResource(infra);
-
-        var cogUserRa = foundryAccount.CreateRoleAssignment(CognitiveServicesBuiltInRole.CognitiveServicesUser, RoleManagementPrincipalType.ServicePrincipal, project.Identity.PrincipalId);
-        // There's a bug in the CDK, see https://github.com/Azure/azure-sdk-for-net/issues/47265
-        cogUserRa.Name = BicepFunction.CreateGuid(foundryAccount.Id, project.Id, cogUserRa.RoleDefinitionId);
-        infra.Add(cogUserRa);
-    });
+var project = foundry.AddProject("projvoiceskiresort");
 var deployment = project.AddModelDeployment("gpt41", FoundryModel.OpenAI.Gpt41)
     .WithProperties(configure => configure.SkuCapacity = 10);
 var voiceDeployment = project.AddModelDeployment("gptrealtime", FoundryModel.OpenAI.GptRealtime)
@@ -42,7 +25,7 @@ var voiceDeployment = project.AddModelDeployment("gptrealtime", FoundryModel.Ope
 
 var webSearch = project.AddWebSearchTool("websearch");
 
-var skiResearcher =project.AddPromptAgent(deployment, name: "skiresearcher",
+var skiResearcher =project.AddPromptAgent("skiresearcher", deployment,
     instructions: """You are a ski researcher agent. Your job is to research and provide information about ski.""")
     .WithTool(webSearch);
 
@@ -118,13 +101,13 @@ var liftAgent = builder.AddProject<Projects.LiftTrafficAgent_Dotnet>("lifttraffi
 // ---------------------------------------------------------------------------
 var advisorAgent = builder.AddProject<Projects.AdvisorAgent_Dotnet>("advisoragent")
     .WithHttpEndpoint(targetPort: 9000)
-    .WithReference(project).WaitFor(project)
     .WithReference(deployment).WaitFor(deployment)
     .WithReference(weatherAgent).WaitFor(weatherAgent)
     .WithReference(liftAgent).WaitFor(liftAgent)
     .WithReference(safetyAgent).WaitFor(safetyAgent)
     .WithReference(coachAgent).WaitFor(coachAgent)
-    .WithReference(skiResearcher).WaitFor(skiResearcher);
+    .WithReference(skiResearcher).WaitFor(skiResearcher)
+    .AsHostedAgent(project);
 
 // ---------------------------------------------------------------------------
 // Voice Advisor Agent (.NET) — Voice orchestrator via WebSocket + Voice Live
@@ -140,8 +123,6 @@ var advisorAgent = builder.AddProject<Projects.AdvisorAgent_Dotnet>("advisoragen
         .WithReference(coachAgent).WaitFor(coachAgent)
         .WithReference(skiResearcher).WaitFor(skiResearcher)
         .WithComputeEnvironment(aca);
-
-advisorAgent.PublishAsHostedAgent(project);
 
 if (builder.ExecutionContext.IsRunMode)
 {

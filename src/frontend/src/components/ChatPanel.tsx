@@ -203,12 +203,12 @@ export default function ChatPanel() {
   }
 
   return (
-    <div className="rounded-2xl bg-slate-800/80 flex flex-col h-full">
-      <div className="flex items-center justify-between px-5 pt-5 pb-3">
+    <div className="rounded-2xl bg-slate-800/80 flex min-w-0 flex-col h-full">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 px-4 sm:px-5 pt-5 pb-3">
         <h2 className="text-lg font-semibold text-violet-300">
           🤖 AI Advisor
         </h2>
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           <VoiceButton
             onTranscript={handleVoiceTranscript}
             onClearAudio={handleClearAudio}
@@ -225,7 +225,7 @@ export default function ChatPanel() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-5 space-y-3">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-5 space-y-3">
         {messages.length === 0 && (
           <p className="text-slate-500 text-sm pt-8 text-center">
             Ask the AlpineAI advisor about conditions, recommendations, or
@@ -235,10 +235,10 @@ export default function ChatPanel() {
         {messages.map((msg, i) => (
           <div
             key={i}
-            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`max-w-[85%] rounded-xl px-4 py-2 text-sm whitespace-pre-wrap ${
+              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
+              <div
+                className={`max-w-[85%] min-w-0 break-words rounded-xl px-4 py-2 text-sm whitespace-pre-wrap ${
                 msg.role === 'user'
                   ? 'bg-violet-600 text-white'
                   : 'bg-slate-700 text-slate-200'
@@ -256,10 +256,10 @@ export default function ChatPanel() {
 
       <form
         onSubmit={handleSubmit}
-        className="flex gap-2 px-5 py-4 border-t border-slate-700"
+        className="flex min-w-0 gap-2 px-4 sm:px-5 py-4 border-t border-slate-700"
       >
         <input
-          className="flex-1 rounded-lg bg-slate-700 px-4 py-2 text-sm text-white placeholder-slate-400 outline-none focus:ring-2 focus:ring-violet-500"
+          className="min-w-0 flex-1 rounded-lg bg-slate-700 px-4 py-2 text-sm text-white placeholder-slate-400 outline-none focus:ring-2 focus:ring-violet-500"
           placeholder="Ask the AI advisor…"
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -268,7 +268,7 @@ export default function ChatPanel() {
         <button
           type="submit"
           disabled={loading}
-          className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500 disabled:opacity-50 transition-colors"
+          className="shrink-0 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500 disabled:opacity-50 transition-colors"
         >
           Send
         </button>

@@ -405,3 +405,5 @@ FodyWeavers.xsd
 
 **/*/appsettings.Development.json
 agent-framework-aspire.sln
+
+.nugetpackages/

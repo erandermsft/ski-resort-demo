@@ -2,6 +2,7 @@
   "appHost": {
     "path": "apphost.cs"
   },
+  "channel": "staging",
   "profiles": {
     "https": {
       "applicationUrl": "https://skiresort.dev.localhost:17032;http://skiresort.dev.localhost:15109",
