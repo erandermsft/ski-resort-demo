@@ -50,9 +50,9 @@ export default function VoiceButton({ onTranscript, onConversationId, onClearAud
     const statusLabel = STATUS_LABELS[status];
 
     return (
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
             <button
-                className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                     isActive
                         ? 'bg-red-600 text-white hover:bg-red-500 animate-pulse'
                         : 'bg-slate-700 text-slate-300 hover:bg-slate-600 hover:text-white'
@@ -64,7 +64,7 @@ export default function VoiceButton({ onTranscript, onConversationId, onClearAud
                 {isActive ? '🔊 Stop' : '🎙️ Voice'}
             </button>
             {statusLabel && (
-                <span className="text-xs text-slate-400">{statusLabel}</span>
+                <span className="min-w-0 break-words text-xs text-slate-400">{statusLabel}</span>
             )}
             {error && (
                 <span className="text-xs text-red-400" title={error}>⚠️</span>
