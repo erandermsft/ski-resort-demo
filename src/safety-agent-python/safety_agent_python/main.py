@@ -34,6 +34,7 @@ from .agent_executor import SafetyAgentExecutor
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+A2A_AGENT_BASE_URL_ENV = "A2A_AGENT_BASE_URL"
 
 
 def _configure_from_aspire_connection_string():
@@ -52,14 +53,13 @@ def _configure_from_aspire_connection_string():
                 os.environ.setdefault("AZURE_OPENAI_CHAT_DEPLOYMENT_NAME", value)
 
 
-def get_agent_card(host: str, port: int) -> AgentCard:
+def get_agent_card(agent_url: str) -> AgentCard:
     """
     Create and return the AgentCard for the Safety Agent.
-    
+
     Args:
-        host: The hostname where the agent is running
-        port: The port number where the agent is running
-        
+        agent_url: The JSON-RPC endpoint advertised in the agent card
+
     Returns:
         AgentCard: The agent card describing capabilities and skills
     """
@@ -71,7 +71,7 @@ def get_agent_card(host: str, port: int) -> AgentCard:
         default_output_modes=["text"],
         supported_interfaces=[
             AgentInterface(
-                url=f"https://localhost:{port}/",
+                url=agent_url,
                 protocol_binding="JSONRPC",
                 protocol_version="1.0",
             )
@@ -98,16 +98,20 @@ def get_agent_card(host: str, port: int) -> AgentCard:
     )
 
 
+def get_agent_url(port: int) -> str:
+    base_url = os.environ.get(A2A_AGENT_BASE_URL_ENV, f"http://localhost:{port}")
+    return f"{base_url.rstrip('/')}/"
+
+
 def create_app():
     """Create and configure the FastAPI A2A application."""
     _configure_from_aspire_connection_string()
 
     port = int(os.environ.get("PORT", 8082))
-    host = os.environ.get("HOST", "0.0.0.0")
 
     configure_otel_providers(enable_sensitive_data=True)
 
-    agent_card = get_agent_card(host, port)
+    agent_card = get_agent_card(get_agent_url(port))
     agent_executor = SafetyAgentExecutor()
     task_store = InMemoryTaskStore()
 

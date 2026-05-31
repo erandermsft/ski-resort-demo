@@ -13,6 +13,7 @@
 using Aspire.Hosting.Foundry;
 
 var builder = DistributedApplication.CreateBuilder(args);
+const string A2AAgentBaseUrlEnvironmentVariable = "A2A_AGENT_BASE_URL";
 
 var aca = builder.AddAzureContainerAppEnvironment("aca");
 
@@ -59,9 +60,9 @@ var weatherAgent = builder.AddUvicornApp("weatheragent", "./weather-agent-python
     .WithExternalHttpEndpoints()
     .WithHttpHealthCheck("/health")
     .WithReference(deployment).WaitFor(deployment)
-    // .WithEnvironment("AZURE_TENANT_ID", tenantId)
     .WithReference(dataGenerator).WaitFor(dataGenerator)
     .WithComputeEnvironment(aca);
+weatherAgent.WithEnvironment(A2AAgentBaseUrlEnvironmentVariable, weatherAgent.GetEndpoint("http"));
 
 // ---------------------------------------------------------------------------
 // Safety Agent (Python)
@@ -71,9 +72,9 @@ var safetyAgent = builder.AddUvicornApp("safetyagent", "./safety-agent-python", 
     .WithExternalHttpEndpoints()
     .WithHttpHealthCheck("/health")
     .WithReference(deployment).WaitFor(deployment)
-    // .WithEnvironment("AZURE_TENANT_ID", tenantId)
     .WithReference(dataGenerator).WaitFor(dataGenerator)
     .WithComputeEnvironment(aca);
+safetyAgent.WithEnvironment(A2AAgentBaseUrlEnvironmentVariable, safetyAgent.GetEndpoint("http"));
 
 // ---------------------------------------------------------------------------
 // Ski Coach Agent (Python)
@@ -83,9 +84,9 @@ var coachAgent = builder.AddUvicornApp("skicoachagent", "./ski-coach-agent-pytho
     .WithExternalHttpEndpoints()
     .WithHttpHealthCheck("/health")
     .WithReference(deployment).WaitFor(deployment)
-    // .WithEnvironment("AZURE_TENANT_ID", tenantId)
     .WithReference(dataGenerator).WaitFor(dataGenerator)
     .WithComputeEnvironment(aca);
+coachAgent.WithEnvironment(A2AAgentBaseUrlEnvironmentVariable, coachAgent.GetEndpoint("http"));
 
 // ---------------------------------------------------------------------------
 // Lift Traffic Agent (.NET)
@@ -95,6 +96,7 @@ var liftAgent = builder.AddProject<Projects.LiftTrafficAgent_Dotnet>("lifttraffi
     .WithReference(deployment).WaitFor(deployment)
     .WithReference(dataGenerator).WaitFor(dataGenerator)
     .WithComputeEnvironment(aca);
+liftAgent.WithEnvironment(A2AAgentBaseUrlEnvironmentVariable, liftAgent.GetEndpoint("http"));
 
 // ---------------------------------------------------------------------------
 // Advisor Agent (.NET) — Orchestrator

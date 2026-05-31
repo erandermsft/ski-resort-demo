@@ -6,7 +6,7 @@ import os
 
 from agent_framework.foundry import FoundryChatClient
 from agent_framework_a2a import A2AExecutor
-from azure.identity import AzureCliCredential
+from azure.identity import DefaultAzureCredential
 
 from tools.coach_tools import recommend_slope, build_day_plan
 
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class SkiCoachAgentExecutor(A2AExecutor):
 
     def __init__(self):
-        agent = FoundryChatClient(project_endpoint=os.getenv("GPT41_URI"), credential=AzureCliCredential(), model="gpt41").as_agent(
+        agent = FoundryChatClient(project_endpoint=os.getenv("GPT41_URI"), credential=DefaultAzureCredential(), model="gpt41").as_agent(
             name="skicoachagent",
             instructions="""You are the Ski Coach Agent for AlpineAI ski resort. You help skiers find the best slopes based on their skill level, preferences, and current conditions.
 

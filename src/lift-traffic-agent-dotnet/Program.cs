@@ -9,6 +9,8 @@ using LiftTrafficAgent.Dotnet.Services;
 using LiftTrafficAgent.Dotnet.Tools;
 using Microsoft.Agents.AI.OpenAI;
 
+const string A2AAgentBaseUrlEnvironmentVariable = "A2A_AGENT_BASE_URL";
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
@@ -61,8 +63,10 @@ var app = builder.Build();
 // Enable CORS
 app.UseCors();
 
-var agentBaseUrl = app.Configuration["ASPNETCORE_URLS"]?.Split(';')[0] ?? "http://localhost:5196";
-var agentUrl = $"{agentBaseUrl}/agenta2a";
+var agentBaseUrl = Environment.GetEnvironmentVariable(A2AAgentBaseUrlEnvironmentVariable)
+    ?? app.Configuration["ASPNETCORE_URLS"]?.Split(';')[0]
+    ?? "http://localhost:5196";
+var agentUrl = $"{agentBaseUrl.TrimEnd('/')}/agenta2a";
 var hostA2AAgentCard = new AgentCard
 {
     Name = "lifttrafficagent",

@@ -6,7 +6,7 @@ import os
 
 from agent_framework.foundry import FoundryChatClient
 from agent_framework_a2a import A2AExecutor
-from azure.identity import AzureCliCredential
+from azure.identity import DefaultAzureCredential
 
 from tools.safety_tools import evaluate_risk, is_slope_safe, get_closed_slopes
 
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class SafetyAgentExecutor(A2AExecutor):
 
     def __init__(self):
-        agent = FoundryChatClient(project_endpoint=os.getenv("GPT41_URI"), credential=AzureCliCredential(), model="gpt41",).as_agent(
+        agent = FoundryChatClient(project_endpoint=os.getenv("GPT41_URI"), credential=DefaultAzureCredential(), model="gpt41",).as_agent(
             name="safetyagent",
             instructions="""You are the Safety Agent for AlpineAI ski resort. Your role is to evaluate risk across slopes using weather, avalanche, and visibility data. 
 

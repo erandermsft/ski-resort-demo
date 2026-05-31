@@ -9,7 +9,7 @@ export default function App() {
       <header className="flex min-w-0 items-center gap-3 px-4 sm:px-6 py-4 border-b border-slate-700/60 bg-slate-900/80 backdrop-blur">
         <span className="text-2xl shrink-0">🏔️</span>
         <h1 className="min-w-0 text-lg sm:text-xl font-bold text-white tracking-tight">
-          (Al)PineAI
+          AlpineAI
           <span className="block sm:inline text-slate-400 font-normal sm:ml-2 text-sm sm:text-base">
             Ski Resort Dashboard
           </span>
