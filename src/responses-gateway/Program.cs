@@ -16,7 +16,7 @@ builder.Services.AddHttpClient(DataGeneratorClientName, client =>
 });
 builder.Services.AddHttpClient(AdvisorAgentClientName, client =>
 {
-    client.BaseAddress = new Uri("https+http://advisoragent/");
+    client.BaseAddress = new Uri("https+http://advisoragent-ha/");
 });
 
 var app = builder.Build();

@@ -103,7 +103,6 @@ liftAgent.WithEnvironment(A2AAgentBaseUrlEnvironmentVariable, liftAgent.GetEndpo
 // Advisor Agent (.NET) — Orchestrator
 // ---------------------------------------------------------------------------
 var advisorAgent = builder.AddProject<Projects.AdvisorAgent_Dotnet>("advisoragent")
-    .WithHttpEndpoint(targetPort: 9000)
     .WithReference(deployment).WaitFor(deployment)
     .WithReference(weatherAgent).WaitFor(weatherAgent)
     .WithReference(liftAgent).WaitFor(liftAgent)
