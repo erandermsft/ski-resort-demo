@@ -1,6 +1,6 @@
 #:sdk Aspire.AppHost.Sdk@13.4.0
 #:package Aspire.Hosting.Azure.AppContainers@13.4.0
-#:package Aspire.Hosting.Foundry@13.4.0-preview.1.26279.43
+#:package Aspire.Hosting.Foundry@13.4.0-preview.1.26281.15
 #:package Aspire.Hosting.Azure.CosmosDB@13.4.0
 #:package Aspire.Hosting.Python@13.4.0
 #:package Aspire.Hosting.JavaScript@13.4.0
@@ -8,6 +8,7 @@
 
 #:project ./advisor-agent-dotnet/AdvisorAgent.Dotnet.csproj
 #:project ./lift-traffic-agent-dotnet/LiftTrafficAgent.Dotnet.csproj
+#:project ./responses-gateway/ResponsesGateway.csproj
 #:project ./voice-advisor-agent/VoiceAdvisorAgent.csproj
 
 using Aspire.Hosting.Foundry;
@@ -114,33 +115,57 @@ var advisorAgent = builder.AddProject<Projects.AdvisorAgent_Dotnet>("advisoragen
 // ---------------------------------------------------------------------------
 // Voice Advisor Agent (.NET) — Voice orchestrator via WebSocket + Voice Live
 // ---------------------------------------------------------------------------
-    var voiceAdvisorAgent = builder.AddProject<Projects.VoiceAdvisorAgent>("voiceadvisoragent")
-        .WithReference(project).WaitFor(project)
-        .WithReference(deployment).WaitFor(deployment)
-        .WithReference(voiceDeployment).WaitFor(voiceDeployment)
-        .WithReference(conversations).WaitFor(conversations)
-        .WithReference(weatherAgent).WaitFor(weatherAgent)
-        .WithReference(liftAgent).WaitFor(liftAgent)
-        .WithReference(safetyAgent).WaitFor(safetyAgent)
-        .WithReference(coachAgent).WaitFor(coachAgent)
-        .WithReference(skiResearcher).WaitFor(skiResearcher)
-        .WithComputeEnvironment(aca);
+var voiceAdvisorAgent = builder.AddProject<Projects.VoiceAdvisorAgent>("voiceadvisoragent")
+    .WithReference(project).WaitFor(project)
+    .WithReference(deployment).WaitFor(deployment)
+    .WithReference(voiceDeployment).WaitFor(voiceDeployment)
+    .WithReference(conversations).WaitFor(conversations)
+    .WithReference(weatherAgent).WaitFor(weatherAgent)
+    .WithReference(liftAgent).WaitFor(liftAgent)
+    .WithReference(safetyAgent).WaitFor(safetyAgent)
+    .WithReference(coachAgent).WaitFor(coachAgent)
+    .WithReference(skiResearcher).WaitFor(skiResearcher)
+    .WithComputeEnvironment(aca);
 
-if (builder.ExecutionContext.IsRunMode)
-{
 // ---------------------------------------------------------------------------
 // Frontend Dashboard (Vite + React)
 // ---------------------------------------------------------------------------
+var frontend = builder.AddViteApp("frontend", "./frontend", "dev")
+    .WithReference(voiceAdvisorAgent).WaitFor(voiceAdvisorAgent)
+    .WithReference(dataGenerator).WaitFor(dataGenerator)
+    .WithUrls((e) =>
+    {
+        e.Urls.Clear();
+        e.Urls.Add(new() { Url = "/", DisplayText = "⛷️ Ski Resort Dashboard", Endpoint = e.GetEndpoint("http") });
+    })
+    .WithComputeEnvironment(aca);
 
-    builder.AddViteApp("frontend", "./frontend", "dev")
+if (builder.ExecutionContext.IsRunMode)
+{
+    frontend.WithReference(advisorAgent).WaitFor(advisorAgent);
+}
+
+if (builder.ExecutionContext.IsPublishMode)
+{
+    builder.AddProject<Projects.ResponsesGateway>("frontendgateway")
+        .WithHttpEndpoint(env: "PORT")
+        .WithExternalHttpEndpoints()
         .WithReference(advisorAgent).WaitFor(advisorAgent)
-        .WithReference(voiceAdvisorAgent).WaitFor(voiceAdvisorAgent)
         .WithReference(dataGenerator).WaitFor(dataGenerator)
+        .WithReference(voiceAdvisorAgent).WaitFor(voiceAdvisorAgent)
+        .WithReference(project).WaitFor(project)
+        .WithHttpHealthCheck("/readiness")
+        .PublishWithContainerFiles(frontend, "./wwwroot")
         .WithUrls((e) =>
         {
             e.Urls.Clear();
             e.Urls.Add(new() { Url = "/", DisplayText = "⛷️ Ski Resort Dashboard", Endpoint = e.GetEndpoint("http") });
-        });
+        })
+        .WithComputeEnvironment(aca);
+}
+
+if (builder.ExecutionContext.IsRunMode)
+{
 
     builder.AddViteApp("slides", "../slides", "start")
         .WithUrls((e) =>

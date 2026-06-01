@@ -5,6 +5,9 @@
   <Folder Name="/lift-traffic-agent-dotnet/">
     <Project Path="lift-traffic-agent-dotnet/LiftTrafficAgent.Dotnet.csproj" />
   </Folder>
+  <Folder Name="/responses-gateway/">
+    <Project Path="responses-gateway/ResponsesGateway.csproj" />
+  </Folder>
   <Folder Name="/voice-advisor-agent/">
     <Project Path="voice-advisor-agent/VoiceAdvisorAgent.csproj" />
   </Folder>
