@@ -211,8 +211,9 @@ export default function ChatPanel() {
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <VoiceButton
             onTranscript={handleVoiceTranscript}
+            onConversationId={setContextId}
             onClearAudio={handleClearAudio}
-            disabled={loading || !contextId}
+            disabled={loading}
             conversationId={contextId}
           />
           <button
