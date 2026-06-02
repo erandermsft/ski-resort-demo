@@ -1,7 +1,16 @@
+using System.Data.Common;
 using System.Net.WebSockets;
+using System.ClientModel;
+using System.ClientModel.Primitives;
+using System.Text.Json.Nodes;
+using Azure.AI.Extensions.OpenAI;
+using Azure.AI.Projects;
+using Azure.Core;
+using Azure.Identity;
+
+#pragma warning disable OPENAI001
 
 const string DataGeneratorClientName = "datagenerator";
-const string AdvisorAgentClientName = "advisoragent";
 const string VoiceAdvisorEndpoint = "http://voiceadvisoragent";
 const string VoiceAdvisorPath = "/ws/voice";
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
@@ -14,10 +23,13 @@ builder.Services.AddHttpClient(DataGeneratorClientName, client =>
 {
     client.BaseAddress = new Uri("https+http://datagenerator/");
 });
-builder.Services.AddHttpClient(AdvisorAgentClientName, client =>
-{
-    client.BaseAddress = new Uri("https+http://advisoragent-ha/");
-});
+builder.Services.AddSingleton<TokenCredential>(_ => new ChainedTokenCredential(
+    CreateManagedIdentityCredential(),
+    new AzureCliCredential()));
+builder.Services.AddSingleton(sp => new AIProjectClient(
+    endpoint: new Uri(GetFoundryProjectEndpoint()),
+    tokenProvider: sp.GetRequiredService<TokenCredential>()));
+builder.Services.AddSingleton<FoundryResponsesClientProvider>();
 
 var app = builder.Build();
 
@@ -29,10 +41,7 @@ app.MapGet("/readiness", () => Results.Ok("Ready"));
 
 app.Map("/api/{**catchAll}", (HttpContext context, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken) =>
     ProxyHttpAsync(context, httpClientFactory, DataGeneratorClientName, cancellationToken));
-app.Map("/responses", (HttpContext context, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken) =>
-    ProxyHttpAsync(context, httpClientFactory, AdvisorAgentClientName, cancellationToken));
-app.Map("/responses/{**catchAll}", (HttpContext context, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken) =>
-    ProxyHttpAsync(context, httpClientFactory, AdvisorAgentClientName, cancellationToken));
+app.MapPost("/responses", ProxyFoundryResponsesAsync);
 app.Map("/ws/voice", context => ProxyWebSocketAsync(context, VoiceAdvisorPath));
 app.Map("/ws/live", context => ProxyWebSocketAsync(context, VoiceAdvisorPath));
 
@@ -60,8 +69,96 @@ static async Task ProxyHttpAsync(
     await responseMessage.Content.CopyToAsync(context.Response.Body, cancellationToken);
 }
 
+static async Task ProxyFoundryResponsesAsync(
+    HttpContext context,
+    FoundryResponsesClientProvider clientProvider,
+    CancellationToken cancellationToken)
+{
+    var responseClient = await clientProvider.GetClientAsync(cancellationToken);
+    using var requestContent = await CreateFoundryRequestContentAsync(context.Request, cancellationToken);
+    var requestOptions = CreateFoundryRequestOptions(context.Request, cancellationToken);
+    using var responseMessage = (await responseClient.CreateResponseAsync(requestContent, requestOptions)).GetRawResponse();
+
+    context.Response.StatusCode = responseMessage.Status;
+    CopySdkResponseHeaders(responseMessage, context.Response);
+
+    if (responseMessage.ContentStream is not null)
+    {
+        await responseMessage.ContentStream.CopyToAsync(context.Response.Body, cancellationToken);
+    }
+}
+
+static async Task<BinaryContent> CreateFoundryRequestContentAsync(HttpRequest request, CancellationToken cancellationToken)
+{
+    var requestBody = await JsonNode.ParseAsync(request.Body, cancellationToken: cancellationToken);
+    if (requestBody is not JsonObject requestObject)
+    {
+        throw new BadHttpRequestException("Responses request body must be a JSON object.");
+    }
+
+    if (requestObject.TryGetPropertyValue("conversation", out var conversationNode))
+    {
+        requestObject.Remove("conversation");
+        var conversationId = conversationNode?.GetValue<string>();
+        if (!string.IsNullOrWhiteSpace(conversationId) && !Guid.TryParse(conversationId, out _))
+        {
+            requestObject["conversation_id"] = conversationId;
+        }
+    }
+
+    return BinaryContent.Create(BinaryData.FromString(requestObject.ToJsonString()));
+}
+
 static string BuildTargetPath(HttpRequest request)
     => $"{request.Path.Value?.TrimStart('/')}{request.QueryString}";
+
+static string GetFoundryProjectEndpoint()
+{
+    var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__projvoiceskiresort")
+        ?? throw new InvalidOperationException("ConnectionStrings__projvoiceskiresort is not set.");
+
+    DbConnectionStringBuilder connectionBuilder = new() { ConnectionString = connectionString };
+    if (!connectionBuilder.TryGetValue("Endpoint", out var rawEndpoint) || rawEndpoint is null)
+    {
+        throw new InvalidOperationException("ConnectionStrings__projvoiceskiresort is missing Endpoint.");
+    }
+
+    var endpoint = rawEndpoint.ToString();
+    if (string.IsNullOrWhiteSpace(endpoint))
+    {
+        throw new InvalidOperationException("ConnectionStrings__projvoiceskiresort has an empty Endpoint value.");
+    }
+
+    return endpoint.EndsWith('/') ? endpoint : $"{endpoint}/";
+}
+
+static RequestOptions CreateFoundryRequestOptions(HttpRequest request, CancellationToken cancellationToken)
+{
+    var requestOptions = new RequestOptions
+    {
+        BufferResponse = false,
+        CancellationToken = cancellationToken,
+        ErrorOptions = ClientErrorBehaviors.NoThrow
+    };
+
+    requestOptions.SetHeader("Content-Type", request.ContentType ?? "application/json");
+    if (request.Headers.TryGetValue("Accept", out var acceptHeader))
+    {
+        requestOptions.SetHeader("Accept", acceptHeader.ToString());
+    }
+
+    return requestOptions;
+}
+
+static TokenCredential CreateManagedIdentityCredential()
+{
+    var clientId = Environment.GetEnvironmentVariable("AZURE_CLIENT_ID");
+#pragma warning disable CS0618
+    return string.IsNullOrWhiteSpace(clientId)
+        ? new ManagedIdentityCredential()
+        : new ManagedIdentityCredential(ManagedIdentityId.FromUserAssignedClientId(clientId));
+#pragma warning restore CS0618
+}
 
 static HttpRequestMessage CreateProxyRequest(HttpRequest request, string targetPath)
 {
@@ -169,6 +266,17 @@ static void CopyResponseHeaders(HttpResponseMessage responseMessage, HttpRespons
     }
 }
 
+static void CopySdkResponseHeaders(PipelineResponse responseMessage, HttpResponse response)
+{
+    foreach (var header in responseMessage.Headers)
+    {
+        if (!ShouldSkipResponseHeader(header.Key))
+        {
+            response.Headers[header.Key] = header.Value;
+        }
+    }
+}
+
 static bool ShouldSkipRequestHeader(string headerName)
     => headerName.Equals("Host", StringComparison.OrdinalIgnoreCase)
        || headerName.Equals("Authorization", StringComparison.OrdinalIgnoreCase)
@@ -192,4 +300,35 @@ static bool ShouldSkipResponseHeader(string headerName)
        || headerName.Equals("Trailer", StringComparison.OrdinalIgnoreCase)
        || headerName.Equals("Transfer-Encoding", StringComparison.OrdinalIgnoreCase)
        || headerName.Equals("Upgrade", StringComparison.OrdinalIgnoreCase);
+
+sealed class FoundryResponsesClientProvider(AIProjectClient projectClient)
+{
+    private const string AdvisorAgentName = "advisoragent-ha";
+
+    private readonly SemaphoreSlim initializationLock = new(1, 1);
+    private ProjectResponsesClient? responseClient;
+
+    public async Task<ProjectResponsesClient> GetClientAsync(CancellationToken cancellationToken)
+    {
+        if (responseClient is not null)
+        {
+            return responseClient;
+        }
+
+        await initializationLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (responseClient is null)
+            {
+                responseClient = projectClient.ProjectOpenAIClient.GetProjectResponsesClientForAgentEndpoint(AdvisorAgentName);
+            }
+
+            return responseClient;
+        }
+        finally
+        {
+            initializationLock.Release();
+        }
+    }
+}
 
