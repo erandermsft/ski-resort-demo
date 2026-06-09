@@ -54,7 +54,7 @@ An AI-powered ski resort concierge that coordinates weather intelligence, lift t
 - [uv](https://docs.astral.sh/uv/) (Python package manager)
 - [Go 1.23+](https://go.dev/doc/install)
 - [Node.js 20+](https://nodejs.org/)
-- [.NET Aspire CLI](https://learn.microsoft.com/dotnet/aspire/fundamentals/setup-tooling)
+- [Aspire CLI](https://aspire.dev/get-started/install-cli/)
 - An **Azure AI Foundry** resource with a `gpt-4.1` (or similar) deployment
 - **Azure CLI** authenticated (`az login`)
 
