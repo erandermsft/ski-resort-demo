@@ -1,9 +1,9 @@
-#:sdk Aspire.AppHost.Sdk@13.4.0
-#:package Aspire.Hosting.Azure.AppContainers@13.4.0
-#:package Aspire.Hosting.Foundry@13.4.0-preview.1.26281.15
-#:package Aspire.Hosting.Azure.CosmosDB@13.4.0
-#:package Aspire.Hosting.Python@13.4.0
-#:package Aspire.Hosting.JavaScript@13.4.0
+#:sdk Aspire.AppHost.Sdk@13.4.2
+#:package Aspire.Hosting.Azure.AppContainers@13.4.2
+#:package Aspire.Hosting.Foundry@13.4.2-preview.1.26303.6
+#:package Aspire.Hosting.Azure.CosmosDB@13.4.2
+#:package Aspire.Hosting.Python@13.4.2
+#:package Aspire.Hosting.JavaScript@13.4.2
 #:package CommunityToolkit.Aspire.Hosting.Golang@13.3.0
 
 #:project ./advisor-agent-dotnet/AdvisorAgent.Dotnet.csproj
@@ -132,17 +132,13 @@ var voiceAdvisorAgent = builder.AddProject<Projects.VoiceAdvisorAgent>("voiceadv
 var frontend = builder.AddViteApp("frontend", "./frontend", "dev")
     .WithReference(voiceAdvisorAgent).WaitFor(voiceAdvisorAgent)
     .WithReference(dataGenerator).WaitFor(dataGenerator)
+    .WithReference(advisorAgent).WaitFor(advisorAgent)
     .WithUrls((e) =>
     {
         e.Urls.Clear();
         e.Urls.Add(new() { Url = "/", DisplayText = "⛷️ Ski Resort Dashboard", Endpoint = e.GetEndpoint("http") });
     })
     .WithComputeEnvironment(aca);
-
-if (builder.ExecutionContext.IsRunMode)
-{
-    frontend.WithReference(advisorAgent).WaitFor(advisorAgent);
-}
 
 if (builder.ExecutionContext.IsPublishMode)
 {
