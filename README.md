@@ -4,11 +4,6 @@ A distributed, multi-agent ski resort system built with **Microsoft Agent Framew
 
 An AI-powered ski resort concierge that coordinates weather intelligence, lift traffic, safety evaluation, personalized coaching, web-backed ski research, and voice conversations through a network of specialist agents — all orchestrated by hosted advisor experiences and displayed on a real-time dashboard.
 
-![.NET](https://img.shields.io/badge/.NET_10-512BD4?style=flat&logo=dotnet&logoColor=white)
-![Python](https://img.shields.io/badge/Python_3.11+-3776AB?style=flat&logo=python&logoColor=white)
-![Aspire](https://img.shields.io/badge/Aspire_13.1-512BD4?style=flat&logo=dotnet&logoColor=white)
-![React](https://img.shields.io/badge/React_+_Vite-61DAFB?style=flat&logo=react&logoColor=black)
-
 ## Architecture
 
 ```
