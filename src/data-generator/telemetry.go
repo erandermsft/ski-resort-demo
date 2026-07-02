@@ -44,6 +44,11 @@ func setupTelemetry(ctx context.Context) (func(context.Context) error, *slog.Log
 	tracerProvider := trace.NewTracerProvider(
 		trace.WithBatcher(traceExporter),
 		trace.WithResource(res),
+		// The data generator is polled constantly (frontend dashboard, health checks), which
+		// floods the trace view with standalone single-span traces. Never-sample root spans so
+		// that contextless polls are dropped, but still record spans that are part of an agent's
+		// distributed trace (i.e. arrive with a sampled remote parent via propagated traceparent).
+		trace.WithSampler(trace.ParentBased(trace.NeverSample())),
 	)
 	otel.SetTracerProvider(tracerProvider)
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(

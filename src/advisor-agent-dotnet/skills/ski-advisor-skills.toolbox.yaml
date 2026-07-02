@@ -1,0 +1,5 @@
+description: Skills for the AlpineAI ski resort advisor agent.
+skills:
+  # Follows each skill's default version. Pin with `version: "1"` to lock a snapshot.
+  - name: safety-disclosure
+    

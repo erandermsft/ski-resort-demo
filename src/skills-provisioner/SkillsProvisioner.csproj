@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Only needed for DefaultAzureCredential (Azure.Identity) + TokenRequestContext (Azure.Core),
+         which Azure.AI.Projects brings transitively at the version the solution already resolves.
+         Skill/toolbox provisioning is done over the documented REST API, not the SDK. -->
+    <PackageReference Include="Azure.AI.Projects" Version="2.1.0-beta.2" />
+  </ItemGroup>
+
+</Project>

@@ -3,10 +3,13 @@ using Microsoft.Agents.AI.Foundry.Hosting;
 using Microsoft.Extensions.AI;
 using Azure.AI.Projects;
 using Azure.AI.AgentServer.Responses;
+using Azure.Core;
 using Azure.Identity;
 using System.Data.Common;
+using System.Net.Http.Headers;
 using A2A;
 using Azure.AI.Extensions.OpenAI;
+using ModelContextProtocol.Client;
 using CreateResponse = Azure.AI.AgentServer.Responses.Models.CreateResponse;
 
 #pragma warning disable OPENAI001
@@ -73,17 +76,72 @@ var skiResearcherAgentReference = new AgentReference(name: Environment.GetEnviro
 var responseClient = foundryProjectClient.ProjectOpenAIClient.GetProjectResponsesClientForAgent(skiResearcherAgentReference);
 var skiResearcherAgent = responseClient.AsIChatClient("gpt41").AsAIAgent(Environment.GetEnvironmentVariable("SKIRESEARCHER_AGENTNAME"), description: "I can search the web. Use me for any generic question about skiing.");
 
-var agent = new AIProjectClient(new Uri(projectEndpoint), new DefaultAzureCredential())
+// Optional Foundry Toolbox MCP skills.
+// When TOOLBOX_NAME is set, connect to the toolbox MCP endpoint and expose its skills to
+// the agent via the Agent Skills progressive-disclosure pattern: skill names/descriptions
+// are advertised in the system prompt, and full skill bodies (plus any supplementary
+// resources) are fetched from the toolbox only when the model decides it needs them.
+AIContextProvider? skillsProvider = null;
+var toolboxName = Environment.GetEnvironmentVariable("TOOLBOX_NAME");
+if (!string.IsNullOrWhiteSpace(toolboxName))
+{
+    try
+    {
+        var toolboxMcpServerUrl = $"{projectEndpoint.TrimEnd('/')}/toolboxes/{toolboxName}/mcp?api-version=v1";
+
+        // HttpClient that attaches a fresh Foundry bearer token to every request. Kept alive for
+        // the lifetime of the process (no using/dispose) so the MCP connection stays open.
+        var toolboxHttpClient = new HttpClient(
+            new BearerTokenHandler(credential, "https://ai.azure.com/.default")
+            {
+                CheckCertificateRevocationList = true,
+            });
+
+        var toolboxMcpClient = await McpClient.CreateAsync(
+            new HttpClientTransport(
+                new HttpClientTransportOptions
+                {
+                    Endpoint = new Uri(toolboxMcpServerUrl),
+                    Name = toolboxName,
+                    TransportMode = HttpTransportMode.StreamableHttp,
+                    // Required while the toolbox MCP surface is in preview.
+                    AdditionalHeaders = new Dictionary<string, string>
+                    {
+                        ["Foundry-Features"] = "Toolboxes=V1Preview",
+                    },
+                },
+                toolboxHttpClient));
+
+        skillsProvider = new AgentSkillsProviderBuilder()
+            .UseMcpSkills(toolboxMcpClient)
+            .Build();
+
+        Console.WriteLine($"Connected to Foundry Toolbox '{toolboxName}' for MCP skills.");
+    }
+    catch (Exception ex)
+    {
+        // Fail soft: if the toolbox isn't provisioned or is unreachable, run without skills
+        // rather than failing agent startup.
+        Console.WriteLine($"Foundry Toolbox '{toolboxName}' unavailable; continuing without skills. {ex.Message}");
+        skillsProvider = null;
+    }
+}
+
+var baseChatClient = new AIProjectClient(new Uri(projectEndpoint), new DefaultAzureCredential())
     .GetProjectOpenAIClient()
     .GetProjectResponsesClient()
     .AsIChatClient(deploymentName) // Converts into a Microsoft.Extensions.AI.IChatClient
     .AsBuilder()
     .ConfigureOptions(options => options.AllowMultipleToolCalls = true)
     .UseOpenTelemetry(sourceName: "Foundry.Agents", configure: (cfg) => cfg.EnableSensitiveData = true)    // Enable OpenTelemetry instrumentation with sensitive data
-    .Build()
-    .AsAIAgent(
-        name: "advisor-agent",
-        instructions: @"You are the Ski Resort Advisor, the main AI concierge for AlpineAI ski resort.
+    .Build();
+
+var advisorAgentOptions = new ChatClientAgentOptions
+{
+    Name = "advisor-agent",
+    ChatOptions = new ChatOptions
+    {
+        Instructions = @"You are the Ski Resort Advisor, the main AI concierge for AlpineAI ski resort.
 
 You have access to four specialist agents as tools:
 - Weather Agent: current conditions, forecasts, storm alerts
@@ -105,13 +163,24 @@ Examples:
 - ""Hi"" or ""Thanks"" → respond directly, no agent calls needed
 
 When you DO call agents, synthesize their responses into one clear answer. Mention any safety concerns prominently. Be friendly, concise, and helpful.",
-        tools: [
+        Tools =
+        [
             weatherAgent.AsAIFunction(),
             liftAgent.AsAIFunction(),
             safetyAgent.AsAIFunction(),
             coachAgent.AsAIFunction(),
             skiResearcherAgent.AsAIFunction()
-        ]);
+        ],
+        AllowMultipleToolCalls = true,
+    },
+};
+
+if (skillsProvider is not null)
+{
+    advisorAgentOptions.AIContextProviders = [skillsProvider];
+}
+
+var agent = baseChatClient.AsAIAgent(advisorAgentOptions);
 
 var ficc = agent.GetService<FunctionInvokingChatClient>();
 ficc?.AllowConcurrentInvocation = true;
@@ -222,5 +291,18 @@ sealed class LocalDevelopmentHostedSessionIsolationKeyProvider : HostedSessionIs
         }
 
         return ValueTask.FromResult<HostedSessionContext?>(new HostedSessionContext(userId, chatId));
+    }
+}
+
+// HttpClientHandler that attaches a fresh Foundry bearer token to every outgoing request.
+internal sealed class BearerTokenHandler(TokenCredential credential, string scope) : HttpClientHandler
+{
+    private readonly TokenRequestContext _tokenContext = new([scope]);
+
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        AccessToken token = await credential.GetTokenAsync(this._tokenContext, cancellationToken).ConfigureAwait(false);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.Token);
+        return await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
     }
 }
