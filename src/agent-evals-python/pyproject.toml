@@ -1,0 +1,16 @@
+[project]
+name = "agent-evals-python"
+version = "0.1.0"
+description = "Foundry rubric + built-in evaluations for the Ski Resort Advisor agent"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "azure-ai-projects>=2.2.0",
+    "azure-identity>=1.19.0",
+]
+
+[tool.uv]
+prerelease = "allow"
+
+[project.scripts]
+run-eval = "run_eval:main"

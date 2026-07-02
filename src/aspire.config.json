@@ -1,6 +1,6 @@
 {
   "appHost": {
-    "path": "apphost.cs"
+    "path": "AppHost.csproj"
   },
   "channel": "staging",
   "profiles": {

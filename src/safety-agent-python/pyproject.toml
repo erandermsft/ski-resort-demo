@@ -39,5 +39,9 @@ dev-dependencies = [
 ]
 prerelease = "allow"
 
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
 [project.scripts]
 start = "safety_agent_python.main:main"

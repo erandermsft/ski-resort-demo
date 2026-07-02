@@ -24,7 +24,14 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.uv]
+dev-dependencies = [
+    "pytest>=7.4.0",
+]
 prerelease = "allow"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
 
 [project.scripts]
 start = "weather_agent_python.main:main"

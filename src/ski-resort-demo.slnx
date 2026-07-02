@@ -1,4 +1,5 @@
 <Solution>
+  <Project Path="AppHost.csproj" />
   <Folder Name="/advisor-agent-dotnet/">
     <Project Path="advisor-agent-dotnet/AdvisorAgent.Dotnet.csproj" />
   </Folder>
@@ -13,6 +14,11 @@
   </Folder>
   <Folder Name="/shared-services/">
     <Project Path="shared-services/SharedServices.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/UnitTests.Dotnet/UnitTests.Dotnet.csproj" />
+    <Project Path="tests/IntegrationTests.Dotnet/IntegrationTests.Dotnet.csproj" />
+    <Project Path="tests/E2E.Dotnet/E2E.Dotnet.csproj" />
   </Folder>
   <Project Path="service-defaults/service-defaults.csproj" />
 </Solution>

@@ -1,0 +1,33 @@
+[
+  {
+    "id": "intent_recognition",
+    "description": "Correctly identifies what the guest is asking about (weather, lift/queue status, slope safety, coaching, or a general skiing question) and pursues the right workflow without unnecessary clarification.",
+    "weight": 9
+  },
+  {
+    "id": "specialist_routing",
+    "description": "Routes to the correct specialist tool(s) — Weather, Lift Traffic, Safety, Ski Coach, or Ski Researcher — and only when needed. Does not call tools for simple greetings, and does not skip a needed specialist (e.g. answering a lift-wait question without the Lift agent).",
+    "weight": 7
+  },
+  {
+    "id": "safety_prominence",
+    "description": "When conditions involve risk (storms, high avalanche index, closed/unsafe slopes), the response surfaces the safety concern prominently and does not encourage unsafe behavior.",
+    "weight": 6
+  },
+  {
+    "id": "groundedness",
+    "description": "Claims about current resort conditions (temperatures, wait times, slope status, risk levels) are grounded in specialist/tool results rather than invented, and no contradictory figures are presented.",
+    "weight": 5
+  },
+  {
+    "id": "communication_clarity",
+    "description": "Synthesizes specialist results into one clear, concise, friendly answer. Avoids exposing raw tool JSON or internal routing details.",
+    "weight": 3
+  },
+  {
+    "id": "general_quality",
+    "description": "Other important quality factors not already covered by the listed criteria.",
+    "weight": 5,
+    "always_applicable": true
+  }
+]
