@@ -3,18 +3,12 @@ using Microsoft.Agents.AI.Foundry.Hosting;
 using Microsoft.Extensions.AI;
 using Azure.AI.Projects;
 using Azure.AI.AgentServer.Responses;
-using Azure.Core;
 using Azure.Identity;
 using System.Data.Common;
-using System.Net.Http.Headers;
 using A2A;
 using Azure.AI.Extensions.OpenAI;
-using ModelContextProtocol.Client;
-using CreateResponse = Azure.AI.AgentServer.Responses.Models.CreateResponse;
 
 #pragma warning disable OPENAI001
-
-const string AgentResponseIdHeader = "x-agent-response-id";
 
 string port = Environment.GetEnvironmentVariable("DEFAULT_AD_PORT") ?? "8088";
 
@@ -76,53 +70,34 @@ var skiResearcherAgentReference = new AgentReference(name: Environment.GetEnviro
 var responseClient = foundryProjectClient.ProjectOpenAIClient.GetProjectResponsesClientForAgent(skiResearcherAgentReference);
 var skiResearcherAgent = responseClient.AsIChatClient("gpt41").AsAIAgent(Environment.GetEnvironmentVariable("SKIRESEARCHER_AGENTNAME"), description: "I can search the web. Use me for any generic question about skiing.");
 
-// Optional Foundry Toolbox MCP skills.
-// When TOOLBOX_NAME is set, connect to the toolbox MCP endpoint and expose its skills to
-// the agent via the Agent Skills progressive-disclosure pattern: skill names/descriptions
-// are advertised in the system prompt, and full skill bodies (plus any supplementary
-// resources) are fetched from the toolbox only when the model decides it needs them.
+// Agent Skills via the filesystem. The skill's SKILL.md is bundled into the container under
+// `skills/<name>/` and loaded by AgentSkillsProvider from disk using the Agent Skills
+// progressive-disclosure pattern: skill names/descriptions are advertised in the system prompt,
+// and the full body is fetched via the `load_skill` tool on demand. `load_skill` is
+// approval-required by design; it is auto-approved below (ToolApprovalAgent) so it completes for
+// non-interactive callers (e.g. batch evaluation). The toolbox is still provisioned in Foundry
+// (skillsprovisioner) for the portal and other MCP consumers.
 AIContextProvider? skillsProvider = null;
-var toolboxName = Environment.GetEnvironmentVariable("TOOLBOX_NAME");
-if (!string.IsNullOrWhiteSpace(toolboxName))
+var skillsRoot = Path.Combine(AppContext.BaseDirectory, "skills");
+if (Directory.Exists(skillsRoot) && Directory.EnumerateDirectories(skillsRoot).Any())
 {
     try
     {
-        var toolboxMcpServerUrl = $"{projectEndpoint.TrimEnd('/')}/toolboxes/{toolboxName}/mcp?api-version=v1";
-
-        // HttpClient that attaches a fresh Foundry bearer token to every request. Kept alive for
-        // the lifetime of the process (no using/dispose) so the MCP connection stays open.
-        var toolboxHttpClient = new HttpClient(
-            new BearerTokenHandler(credential, "https://ai.azure.com/.default")
-            {
-                CheckCertificateRevocationList = true,
-            });
-
-        var toolboxMcpClient = await McpClient.CreateAsync(
-            new HttpClientTransport(
-                new HttpClientTransportOptions
-                {
-                    Endpoint = new Uri(toolboxMcpServerUrl),
-                    Name = toolboxName,
-                    TransportMode = HttpTransportMode.StreamableHttp,
-                    // Required while the toolbox MCP surface is in preview.
-                    AdditionalHeaders = new Dictionary<string, string>
-                    {
-                        ["Foundry-Features"] = "Toolboxes=V1Preview",
-                    },
-                },
-                toolboxHttpClient));
-
         skillsProvider = new AgentSkillsProviderBuilder()
-            .UseMcpSkills(toolboxMcpClient)
+            .UseFileSkill(skillsRoot)
+            // File-based skill sources require a script runner to be configured, even when no
+            // skill declares a script. Our skills are instruction-only (no executable scripts),
+            // so use a no-op runner that refuses execution — it is never invoked.
+            .UseFileScriptRunner((_, _, _, _, _) =>
+                throw new NotSupportedException("Advisor skills are instruction-only; script execution is not enabled."))
             .Build();
 
-        Console.WriteLine($"Connected to Foundry Toolbox '{toolboxName}' for MCP skills.");
+        Console.WriteLine($"Loaded Agent Skills from '{skillsRoot}'.");
     }
     catch (Exception ex)
     {
-        // Fail soft: if the toolbox isn't provisioned or is unreachable, run without skills
-        // rather than failing agent startup.
-        Console.WriteLine($"Foundry Toolbox '{toolboxName}' unavailable; continuing without skills. {ex.Message}");
+        // Fail soft: run without skills rather than failing agent startup.
+        Console.WriteLine($"File skills unavailable; continuing without skills. {ex.Message}");
         skillsProvider = null;
     }
 }
@@ -173,6 +148,7 @@ When you DO call agents, synthesize their responses into one clear answer. Menti
         ],
         AllowMultipleToolCalls = true,
     },
+    EnableNonApprovalRequiredFunctionBypassing = true
 };
 
 if (skillsProvider is not null)
@@ -180,10 +156,24 @@ if (skillsProvider is not null)
     advisorAgentOptions.AIContextProviders = [skillsProvider];
 }
 
-var agent = baseChatClient.AsAIAgent(advisorAgentOptions);
+var innerAgent = baseChatClient.AsAIAgent(advisorAgentOptions);
 
-var ficc = agent.GetService<FunctionInvokingChatClient>();
+var ficc = innerAgent.GetService<FunctionInvokingChatClient>();
 ficc?.AllowConcurrentInvocation = true;
+
+// Auto-approve the AgentSkillsProvider's `load_skill` tool so progressive-disclosure skill
+// loading completes without human approval. `load_skill` is an approval-required tool by
+// design, which stalls non-interactive callers (e.g. batch evaluation); the framework's
+// ToolApprovalAgent middleware with the built-in skills rule approves it automatically.
+// Non-skill tool calls (the A2A specialist agents) that get pulled into the all-or-nothing
+// approval conversion are handled by EnableNonApprovalRequiredFunctionBypassing above.
+var agent = innerAgent
+    .AsBuilder()
+    .UseToolApproval(new ToolApprovalAgentOptions
+    {
+        AutoApprovalRules = [AgentSkillsProvider.AllToolsAutoApprovalRule],
+    })
+    .Build();
 
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls($"http://+:{port}");
@@ -201,19 +191,23 @@ builder.Services.AddCors(options =>
     });
 });
 
-builder.Services.AddFoundryResponses(agent, new FileSystemAgentSessionStore(GetCheckpointDirectory()));
-if (builder.Environment.IsDevelopment())
-{
-    builder.Services.AddSingleton<HostedSessionIsolationKeyProvider, LocalDevelopmentHostedSessionIsolationKeyProvider>();
-}
+// AgentSessionStore selection depends on where the advisor runs:
+//  * Hosted in Foundry (Production): the Foundry platform (FoundryStorageProvider) is the
+//    durable response/history layer, and the hosted container filesystem is read-only
+//    (both $HOME/.checkpoints and /.checkpoints are denied), which crashes a file-backed
+//    store. Use the in-memory store — per-request session state can stay in memory.
+//  * Local development: the advisor is NOT running inside Foundry's hosted runtime, so use a
+//    file-backed store rooted at a writable {cwd}/.checkpoints. This keeps agent-session state
+//    durable across restarts for a good local dev experience.
+AgentSessionStore sessionStore = builder.Environment.IsDevelopment()
+    ? FileSystemAgentSessionStore.CreateDefault()
+    : new InMemoryAgentSessionStore();
+builder.Services.AddFoundryResponses(agent, sessionStore);
 
 var app = builder.Build();
 
 // Enable CORS
 app.UseCors();
-
-// Work around hosted storage conflicts caused by replayed platform response IDs.
-app.Use(UseSdkGeneratedResponseIdsForResponses);
 
 // Map Foundry Responses API endpoint at /responses.
 app.MapFoundryResponses();
@@ -237,72 +231,4 @@ static string GetRequiredConnectionValue(DbConnectionStringBuilder connectionBui
     }
 
     return value;
-}
-
-static string GetCheckpointDirectory()
-{
-    var homeDirectory = Environment.GetEnvironmentVariable("HOME");
-
-    return string.IsNullOrWhiteSpace(homeDirectory)
-        ? Path.Combine(Directory.GetCurrentDirectory(), FileSystemAgentSessionStore.LocalCheckpointDirectoryName)
-        : Path.Combine(homeDirectory, FileSystemAgentSessionStore.LocalCheckpointDirectoryName);
-}
-
-static async Task UseSdkGeneratedResponseIdsForResponses(HttpContext context, Func<Task> next)
-{
-    if (HttpMethods.IsPost(context.Request.Method)
-        && string.Equals(context.Request.Path.Value, "/responses", StringComparison.OrdinalIgnoreCase)
-        && context.Request.Headers.ContainsKey(AgentResponseIdHeader))
-    {
-        context.Request.Headers.Remove(AgentResponseIdHeader);
-    }
-
-    await next();
-}
-
-sealed class LocalDevelopmentHostedSessionIsolationKeyProvider : HostedSessionIsolationKeyProvider
-{
-    private const string UserIsolationKeyEnvironmentVariable = "HOSTED_USER_ISOLATION_KEY";
-    private const string ChatIsolationKeyEnvironmentVariable = "HOSTED_CHAT_ISOLATION_KEY";
-    private const string DefaultLocalUserIsolationKey = "local-dev-user";
-    private const string DefaultLocalChatIsolationKey = "local-dev-chat";
-
-    public override ValueTask<HostedSessionContext?> GetKeysAsync(
-        ResponseContext context,
-        CreateResponse request,
-        CancellationToken cancellationToken)
-    {
-        var userId = !string.IsNullOrWhiteSpace(context.Isolation?.UserIsolationKey)
-            ? context.Isolation.UserIsolationKey
-            : Environment.GetEnvironmentVariable(UserIsolationKeyEnvironmentVariable);
-
-        if (string.IsNullOrWhiteSpace(userId))
-        {
-            userId = DefaultLocalUserIsolationKey;
-        }
-
-        var chatId = !string.IsNullOrWhiteSpace(context.Isolation?.ChatIsolationKey)
-            ? context.Isolation.ChatIsolationKey
-            : Environment.GetEnvironmentVariable(ChatIsolationKeyEnvironmentVariable);
-
-        if (string.IsNullOrWhiteSpace(chatId))
-        {
-            chatId = DefaultLocalChatIsolationKey;
-        }
-
-        return ValueTask.FromResult<HostedSessionContext?>(new HostedSessionContext(userId, chatId));
-    }
-}
-
-// HttpClientHandler that attaches a fresh Foundry bearer token to every outgoing request.
-internal sealed class BearerTokenHandler(TokenCredential credential, string scope) : HttpClientHandler
-{
-    private readonly TokenRequestContext _tokenContext = new([scope]);
-
-    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-    {
-        AccessToken token = await credential.GetTokenAsync(this._tokenContext, cancellationToken).ConfigureAwait(false);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.Token);
-        return await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
-    }
 }

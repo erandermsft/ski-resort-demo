@@ -1,0 +1,80 @@
+# Runs the Foundry rubric evaluation of the Ski Resort Advisor agent on PRs to main.
+#
+# It scores the *currently deployed* advisor agent (azure_ai_target_completions ->
+# azure_ai_agent) with the ski_advisor_rubric + built-in safety/coherence evaluators.
+# The advisor agent and the rubric evaluator must already exist in the target Foundry
+# project (deploy + register the rubric before relying on this check).
+#
+# Required GitHub configuration (Settings -> Secrets and variables -> Actions):
+#   Secrets (a user-assigned managed identity — or app registration — with a GitHub
+#   federated credential, granted the Foundry User role on the project):
+#     AZURE_CLIENT_ID       the UAMI's (or app's) client id
+#     AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
+#   Variables:
+#     AZURE_AI_PROJECT_ENDPOINT       https://<account>.services.ai.azure.com/api/projects/<project>
+#     AZURE_AI_MODEL_DEPLOYMENT_NAME  (optional) judge model deployment, default gpt41
+#     FOUNDRY_AGENT_NAME              (optional) advisor agent name, default advisor-agent
+#     RUBRIC_EVALUATOR_NAME           (optional) registered rubric name, default ski_advisor_rubric
+#
+# Identity setup (user-assigned managed identity, passwordless):
+#   1. Create a UAMI, then add a federated credential to it:
+#        issuer   https://token.actions.githubusercontent.com
+#        subject  repo:erandermsft/ski-resort-demo:pull_request
+#                 (add another for repo:erandermsft/ski-resort-demo:ref:refs/heads/main
+#                  or an environment if you want manual dispatch on main)
+#        audience api://AzureADTokenExchange
+#   2. Assign the UAMI the Foundry User role on the Foundry project.
+#   3. Put the UAMI's client id in AZURE_CLIENT_ID.
+#
+# Note: PRs from forks do not receive secrets, so this check only runs for branches
+# in this repository. Use the manual trigger to run it on demand.
+name: agent-evals
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/agent-evals-python/**"
+      - "src/advisor-agent-dotnet/**"
+      - ".github/workflows/agent-evals.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # required for Azure OIDC login
+  contents: read
+
+jobs:
+  foundry-eval:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/agent-evals-python
+    env:
+      AZURE_AI_PROJECT_ENDPOINT: ${{ vars.AZURE_AI_PROJECT_ENDPOINT }}
+      AZURE_AI_MODEL_DEPLOYMENT_NAME: ${{ vars.AZURE_AI_MODEL_DEPLOYMENT_NAME }}
+      FOUNDRY_AGENT_NAME: ${{ vars.FOUNDRY_AGENT_NAME }}
+      RUBRIC_EVALUATOR_NAME: ${{ vars.RUBRIC_EVALUATOR_NAME }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Run Foundry rubric evaluation
+        run: |
+          uv sync
+          uv run python run_eval.py

@@ -9,19 +9,25 @@
     <NoWarn>$(NoWarn);MEAI001;MAAI001;OPENAI001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Agents.AI" Version="1.8.0" />
-    <PackageReference Include="Microsoft.Agents.AI.A2A" Version="1.8.0-preview.260528.1" />
-    <PackageReference Include="Microsoft.Agents.AI.Abstractions" Version="1.8.0" />
-    <PackageReference Include="Microsoft.Agents.AI.Mcp" Version="1.8.0-alpha.260528.1" />
+    <PackageReference Include="Microsoft.Agents.AI" Version="1.11.1" />
+    <PackageReference Include="Microsoft.Agents.AI.A2A" Version="1.11.1-preview.260625.1" />
+    <PackageReference Include="Microsoft.Agents.AI.Abstractions" Version="1.11.1" />
+    <PackageReference Include="Microsoft.Agents.AI.Mcp" Version="1.11.1-alpha.260625.1" />
     <PackageReference Include="ModelContextProtocol" Version="1.2.0" />
     <PackageReference Include="Azure.AI.AgentServer.Responses" Version="1.0.0-beta.5" />
-    <PackageReference Include="Azure.AI.Projects" Version="2.1.0-beta.2" />
-    <PackageReference Include="Microsoft.Agents.AI.Foundry.Hosting" Version="1.8.0-preview.260528.1" />
+    <PackageReference Include="Azure.AI.Projects" Version="2.1.0-beta.3" />
+    <PackageReference Include="Microsoft.Agents.AI.Foundry.Hosting" Version="1.11.1-preview.260625.1" />
     <PackageReference Include="Aspire.Azure.AI.Inference" Version="13.4.0-preview.1.26279.43" />
     <PackageReference Include="Aspire.Microsoft.Azure.Cosmos" Version="13.4.0" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\service-defaults\service-defaults.csproj" />
     <ProjectReference Include="..\shared-services\SharedServices.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Bundle Agent Skills into the output/container so the advisor can load them from the
+         filesystem via AgentSkillsProvider.UseFileSkill. Exclude the toolbox definition at the
+         skills root so only skill content ships in the image. -->
+    <Content Include="skills\**\*" Exclude="skills\*.yaml;skills\*.yml" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

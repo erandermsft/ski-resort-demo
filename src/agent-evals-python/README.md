@@ -20,10 +20,12 @@ no .NET evaluation SDK at parity. Evals run through the OpenAI evals API exposed
 1. `az login`, with the **Foundry User** role on the project.
 2. A deployed advisor agent (run `aspire deploy`, or provision the Foundry project so the
    agent exists).
-3. Register the rubric in [`rubrics/ski_advisor_rubric.json`](rubrics/ski_advisor_rubric.json)
-   in the project's **evaluator catalog** (Foundry portal: auto-generate a rubric, then
-   paste/adjust these criteria, or import the JSON). Note the registered name.
-4. Environment variables:
+
+The rubric in [`rubrics/ski_advisor_rubric.json`](rubrics/ski_advisor_rubric.json) is
+**registered automatically** by the script (idempotently) in the project's evaluator
+catalog — no manual portal step needed.
+
+Environment variables:
 
    | Variable | Required | Default | Notes |
    | --- | --- | --- | --- |
@@ -31,7 +33,7 @@ no .NET evaluation SDK at parity. Evals run through the OpenAI evals API exposed
    | `AZURE_AI_MODEL_DEPLOYMENT_NAME` | no | `gpt41` | Judge model deployment (rubric + coherence) |
    | `FOUNDRY_AGENT_NAME` | no | `advisor-agent` | The deployed advisor agent name — verify this matches the registered agent |
    | `FOUNDRY_AGENT_VERSION` | no | latest | Pin a version if desired |
-   | `RUBRIC_EVALUATOR_NAME` | no | `ski_advisor_rubric` | Name the rubric was registered under |
+   | `RUBRIC_EVALUATOR_NAME` | no | `ski_advisor_rubric` | Name to register/reference the rubric under |
 
 ## Run
 
@@ -40,5 +42,6 @@ uv sync
 uv run python run_eval.py
 ```
 
-The script uploads the dataset, creates the evaluation, runs it against the agent target,
-polls until completion, and prints per-evaluator pass rates plus the Foundry report URL.
+The script registers the rubric evaluator (if needed), uploads the dataset, creates the
+evaluation, runs it against the agent target, polls until completion, and prints
+per-evaluator pass rates plus the Foundry report URL.

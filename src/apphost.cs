@@ -1,3 +1,18 @@
+// #:sdk Aspire.AppHost.Sdk@13.4.6
+// #:package Aspire.Hosting.Azure.AppContainers@13.4.6
+// #:package Aspire.Hosting.Foundry@13.4.6-preview.1.26319.6
+// #:package Aspire.Hosting.Azure.CosmosDB@13.4.6
+// #:package Aspire.Hosting.Python@13.4.6
+// #:package Aspire.Hosting.JavaScript@13.4.6
+// #:package CommunityToolkit.Aspire.Hosting.Golang@13.3.0
+
+// #:project ./advisor-agent-dotnet/AdvisorAgent.Dotnet.csproj
+// #:project ./lift-traffic-agent-dotnet/LiftTrafficAgent.Dotnet.csproj
+// #:project ./responses-gateway/ResponsesGateway.csproj
+// #:project ./voice-advisor-agent/VoiceAdvisorAgent.csproj
+// #:project ./skills-provisioner/SkillsProvisioner.csproj
+
+using System.Net.Sockets;
 using Aspire.Hosting.Foundry;
 
 var builder = DistributedApplication.CreateBuilder(args);
@@ -22,7 +37,7 @@ if (builder.ExecutionContext.IsPublishMode)
     project.WithAzureContainerRegistry(registry);
 }
 var deployment = project.AddModelDeployment("gpt41", FoundryModel.OpenAI.Gpt51)
-    .WithProperties(configure => configure.SkuCapacity = 10);
+    .WithProperties(configure => configure.SkuCapacity = 100);
 var voiceDeployment = project.AddModelDeployment("gptrealtime", FoundryModel.OpenAI.GptRealtime)
     .WithProperties(configure => configure.SkuCapacity = 5);
 
@@ -154,7 +169,16 @@ if (skillsProvisioner is not null)
     advisorAgentBuilder.WaitForCompletion(skillsProvisioner);
 }
 
-var advisorAgent = advisorAgentBuilder.AsHostedAgent(project);
+var advisorAgent = advisorAgentBuilder.AsHostedAgent(project, config =>
+{
+    // The upgraded Foundry hosting packages (Azure.AI.AgentServer.Core beta.24+) ship a
+    // Responses protocol *v2* adapter. Aspire otherwise registers the agent as responses
+    // v1.0.0, so the Foundry gateway forwards v1 requests that the v2 container rejects
+    // (HTTP 501 unsupported_container_protocol_version). Register v2 to match the container.
+    config.ContainerProtocolVersions.Clear();
+    config.ContainerProtocolVersions.Add(
+        new Azure.AI.Projects.Agents.ProtocolVersionRecord(Azure.AI.Projects.Agents.ProjectsAgentProtocol.Responses, "2.0.0"));
+});
 
 // ---------------------------------------------------------------------------
 // Voice Advisor Agent (.NET) — Voice orchestrator via WebSocket + Voice Live
